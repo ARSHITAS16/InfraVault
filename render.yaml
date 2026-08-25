@@ -1,6 +1,7 @@
 services:
   - type: web
     name: infravault-backend
+    plan: free
     runtime: image
     image:
       url: maven:3.9-eclipse-temurin-21-alpine
