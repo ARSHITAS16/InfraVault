@@ -9,7 +9,7 @@ import {
   ImportPreviewRow,
 } from '../types';
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8080';
+const API_BASE_URL = (import.meta.env.VITE_API_URL as string) || 'https://infravault-backend-znmg.onrender.com';
 
 // Mock Data for Demo Mode on GitHub Pages
 const MOCK_DATACENTERS: Datacenter[] = [
