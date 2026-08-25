@@ -1,6 +1,7 @@
 services:
   - type: web
     name: infravault-backend
+    runtime: image
     region: oregon
     rootDir: backend
     buildCommand: "./mvnw clean package -DskipTests"
