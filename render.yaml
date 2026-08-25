@@ -1,9 +1,10 @@
 services:
   - type: web
     name: infravault-backend
-    runtime: docker
+    region: oregon
     rootDir: backend
-    dockerfilePath: Dockerfile
+    buildCommand: "./mvnw clean package -DskipTests"
+    startCommand: "java -jar target/backend-0.0.1-SNAPSHOT.jar"
     envVars:
       - key: SPRING_DATASOURCE_URL
         fromDatabase:
