@@ -7,7 +7,7 @@ services:
       url: maven:3.9-eclipse-temurin-21-alpine
     region: oregon
     rootDir: backend
-    startCommand: "./mvnw spring-boot:run"
+    startCommand: "mvn spring-boot:run"
     envVars:
       - key: SPRING_DATASOURCE_URL
         fromDatabase:
