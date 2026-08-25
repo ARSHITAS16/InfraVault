@@ -11,14 +11,6 @@ services:
         fromDatabase:
           name: infravault-db
           property: connectionString
-      - key: SPRING_DATASOURCE_USERNAME
-        fromDatabase:
-          name: infravault-db
-          property: user
-      - key: SPRING_DATASOURCE_PASSWORD
-        fromDatabase:
-          name: infravault-db
-          property: password
       - key: SPRING_JPA_HIBERNATE_DDL_AUTO
         value: update
 
