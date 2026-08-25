@@ -1,7 +1,6 @@
 services:
   - type: web
     name: infravault-backend
-    runtime: java
     env: java
     plan: free
     region: oregon
