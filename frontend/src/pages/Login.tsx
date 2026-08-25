@@ -151,6 +151,28 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               ? 'Already have an account? Sign In'
               : "Don't have an account? Register new user"}
           </button>
+
+          <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '16px' }}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-block"
+              style={{ backgroundColor: '#2d3748', borderColor: '#4a5568', color: '#e2e8f0' }}
+              onClick={() => {
+                const demoUser = {
+                  userId: 1,
+                  username: 'admin (Demo Mode)',
+                  role: 'SUPER_ADMIN',
+                  token: 'demo-token-123'
+                };
+                onLoginSuccess(demoUser);
+              }}
+            >
+              🚀 Explore Live UI Demo Mode
+            </button>
+            <small style={{ color: '#a0aec0', fontSize: '11px', display: 'block', marginTop: '6px' }}>
+              Instantly explore InfraVault UI & features on GitHub Pages
+            </small>
+          </div>
         </div>
       </div>
     </div>
