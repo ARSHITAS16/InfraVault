@@ -723,17 +723,33 @@ body {
 .flex-1 { flex: 1; }
 
 .alert {
-  padding: 10px 14px;
-  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
   font-size: 13px;
+  font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
-.alert-danger { background-color: var(--danger-light); color: var(--danger); border: 1px solid var(--danger); }
-.alert-warning { background-color: var(--warning-light); color: var(--warning); border: 1px solid var(--warning); }
-.alert-info { background-color: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid #38bdf8; }
+.alert-danger {
+  background-color: rgba(239, 68, 68, 0.22);
+  color: #fca5a5;
+  border: 1px solid #f87171;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.15);
+}
+
+.alert-warning {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
+  border: 1px solid #fbbf24;
+}
+
+.alert-info {
+  background-color: rgba(56, 189, 248, 0.2);
+  color: #7dd3fc;
+  border: 1px solid #38bdf8;
+}
 
 /* Login Page Styling */
 .login-screen-bg {
