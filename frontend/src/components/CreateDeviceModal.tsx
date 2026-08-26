@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Server, Plus, ShieldAlert, Lock, Trash2 } from 'lucide-react';
+import { Server, Plus, ShieldAlert, Lock, Trash2, Sliders } from 'lucide-react';
 import { foldersApi } from '../services/api';
 
 interface CreateDeviceModalProps {
@@ -31,7 +31,9 @@ export const CreateDeviceModal: React.FC<CreateDeviceModalProps> = ({
     passphrase: '',
   });
 
-  const [customFields, setCustomFields] = useState<{ key: string; value: string }[]>([]);
+  const [customFields, setCustomFields] = useState<{ key: string; value: string }[]>([
+    { key: '', value: '' }
+  ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -45,8 +47,8 @@ export const CreateDeviceModal: React.FC<CreateDeviceModalProps> = ({
     }
   };
 
-  const handleAddCustomField = () => {
-    setCustomFields((prev) => [...prev, { key: '', value: '' }]);
+  const handleAddCustomField = (presetKey = '', presetValue = '') => {
+    setCustomFields((prev) => [...prev, { key: presetKey, value: presetValue }]);
   };
 
   const handleCustomFieldChange = (index: number, field: 'key' | 'value', val: string) => {
@@ -88,7 +90,7 @@ export const CreateDeviceModal: React.FC<CreateDeviceModalProps> = ({
 
   return (
     <div className="modal-backdrop">
-      <div className="modal-content modal-lg" style={{ maxHeight: '90vh' }}>
+      <div className="modal-content modal-lg" style={{ maxHeight: '88vh' }}>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div className="modal-header">
             <div className="modal-title">
@@ -100,7 +102,14 @@ export const CreateDeviceModal: React.FC<CreateDeviceModalProps> = ({
             </button>
           </div>
 
-          <div className="modal-body" style={{ overflowY: 'auto', maxHeight: 'calc(85vh - 120px)', padding: '20px' }}>
+          <div
+            className="modal-body"
+            style={{
+              overflowY: 'scroll',
+              maxHeight: 'calc(88vh - 130px)',
+              padding: '24px',
+            }}
+          >
             {error && (
               <div className="alert alert-danger mb-3">
                 <ShieldAlert size={16} />
@@ -119,7 +128,7 @@ export const CreateDeviceModal: React.FC<CreateDeviceModalProps> = ({
                   type="text"
                   name="hostname"
                   className="form-control"
-                  placeholder="e.g. sjc01-c01-dds01"
+                  placeholder="e.g. blr01-c01-dds01"
                   value={form.hostname}
                   onChange={handleChange}
                   required
@@ -133,7 +142,7 @@ export const CreateDeviceModal: React.FC<CreateDeviceModalProps> = ({
                   type="text"
                   name="model"
                   className="form-control"
-                  placeholder="e.g. DataDomain DD9400"
+                  placeholder="e.g. DataDomain DD9400 / PowerEdge R750"
                   value={form.model}
                   onChange={handleChange}
                 />
@@ -147,7 +156,7 @@ export const CreateDeviceModal: React.FC<CreateDeviceModalProps> = ({
                   type="text"
                   name="serialNumber"
                   className="form-control"
-                  placeholder="e.g. SN-9948271-SJ"
+                  placeholder="e.g. SN-88492041"
                   value={form.serialNumber}
                   onChange={handleChange}
                 />
@@ -159,7 +168,7 @@ export const CreateDeviceModal: React.FC<CreateDeviceModalProps> = ({
                   type="text"
                   name="capacity"
                   className="form-control"
-                  placeholder="e.g. 256TB"
+                  placeholder="e.g. 128TB"
                   value={form.capacity}
                   onChange={handleChange}
                 />
@@ -173,7 +182,7 @@ export const CreateDeviceModal: React.FC<CreateDeviceModalProps> = ({
                   type="text"
                   name="serviceTag"
                   className="form-control"
-                  placeholder="e.g. 7X889K1"
+                  placeholder="e.g. 7X992K2"
                   value={form.serviceTag}
                   onChange={handleChange}
                 />
@@ -216,6 +225,66 @@ export const CreateDeviceModal: React.FC<CreateDeviceModalProps> = ({
                 <label htmlFor="idracConfigured" className="form-label" style={{ marginBottom: 0, cursor: 'pointer' }}>
                   iDRAC / Out-of-band Configured
                 </label>
+              </div>
+            </div>
+
+            <hr style={{ borderColor: 'var(--border-color)', margin: '20px 0' }} />
+
+            {/* Dynamic Custom Fields Section */}
+            <div className="card mb-4" style={{ backgroundColor: '#0f172a', border: '1px solid var(--primary)' }}>
+              <div className="card-body">
+                <div className="flex-between mb-2">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Sliders size={16} color="var(--primary)" />
+                    <h4 style={{ fontSize: '13px', color: 'var(--primary)', margin: 0, fontWeight: 700 }}>
+                      Dynamic Custom Fields & Extra Attributes
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => handleAddCustomField()}
+                  >
+                    <Plus size={14} /> <span>Add Dynamic Field</span>
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Quick Presets:</span>
+                  <button type="button" className="btn btn-secondary btn-sm py-0 px-2" style={{ fontSize: '11px' }} onClick={() => handleAddCustomField('username', '')}>+ Username</button>
+                  <button type="button" className="btn btn-secondary btn-sm py-0 px-2" style={{ fontSize: '11px' }} onClick={() => handleAddCustomField('vcenter service', '')}>+ vCenter Service</button>
+                  <button type="button" className="btn btn-secondary btn-sm py-0 px-2" style={{ fontSize: '11px' }} onClick={() => handleAddCustomField('vmcleaner', '')}>+ VM Cleaner</button>
+                  <button type="button" className="btn btn-secondary btn-sm py-0 px-2" style={{ fontSize: '11px' }} onClick={() => handleAddCustomField('comment', '')}>+ Comment</button>
+                </div>
+
+                {customFields.map((cf, index) => (
+                  <div key={index} style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Field Name (e.g. username, vcenter service)"
+                      style={{ flex: '1' }}
+                      value={cf.key}
+                      onChange={(e) => handleCustomFieldChange(index, 'key', e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Field Value (e.g. root, admin@domain)"
+                      style={{ flex: '1.5' }}
+                      value={cf.value}
+                      onChange={(e) => handleCustomFieldChange(index, 'value', e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm p-1"
+                      onClick={() => handleRemoveCustomField(index)}
+                      title="Remove field"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -277,59 +346,6 @@ export const CreateDeviceModal: React.FC<CreateDeviceModalProps> = ({
                 />
               </div>
             </div>
-
-            <hr style={{ borderColor: 'var(--border-color)', margin: '20px 0' }} />
-
-            {/* Dynamic Custom Fields Section */}
-            <div className="flex-between mb-2">
-              <h4 style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
-                Dynamic Custom Fields & Attributes
-              </h4>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={handleAddCustomField}
-              >
-                <Plus size={14} /> <span>Add Custom Field</span>
-              </button>
-            </div>
-
-            {customFields.length === 0 ? (
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: '16px' }}>
-                No custom text boxes added yet. Click "+ Add Custom Field" to add dynamic attributes like vcenter service, comment, or vmcleaner.
-              </p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
-                {customFields.map((cf, index) => (
-                  <div key={index} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Field Name (e.g. comment)"
-                      style={{ flex: '1' }}
-                      value={cf.key}
-                      onChange={(e) => handleCustomFieldChange(index, 'key', e.target.value)}
-                    />
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Field Value (e.g. vmcleaner service)"
-                      style={{ flex: '1.5' }}
-                      value={cf.value}
-                      onChange={(e) => handleCustomFieldChange(index, 'value', e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-danger btn-sm p-1"
-                      onClick={() => handleRemoveCustomField(index)}
-                      title="Remove field"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
           <div className="modal-footer">
