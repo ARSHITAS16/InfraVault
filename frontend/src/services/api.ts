@@ -43,7 +43,7 @@ export async function apiRequest<T>(
   }
 
   if (!response.ok) {
-    let errorMessage = 'Authentication or API request failed';
+    let errorMessage = 'API request failed';
     if (typeof data === 'object' && data?.message) {
       errorMessage = data.message;
     } else if (typeof data === 'string' && data) {
@@ -81,17 +81,36 @@ export const datacentersApi = {
       body: JSON.stringify(data),
     }),
 
+  createDatacenter: (name: string, description?: string) =>
+    apiRequest<Datacenter>('/api/datacenters', {
+      method: 'POST',
+      body: JSON.stringify({ name, description }),
+    }),
+
   getFolders: (datacenterId: number) =>
     apiRequest<Folder[]>(`/api/datacenters/${datacenterId}/folders`),
+
+  createFolder: (datacenterId: number, name: string) =>
+    apiRequest<Folder>(`/api/datacenters/${datacenterId}/folders`, {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
 
   getUsers: (datacenterId: number) =>
     apiRequest<DatacenterUser[]>(`/api/datacenters/${datacenterId}/users`),
 
-  addUser: (datacenterId: number, data: { userId: number; permissionLevel: string }) =>
-    apiRequest<DatacenterUser>(`/api/datacenters/${datacenterId}/users`, {
+  addUser: (datacenterId: number, userIdOrData: any, permissionLevel?: string) => {
+    let payload = {};
+    if (typeof userIdOrData === 'object' && userIdOrData !== null) {
+      payload = userIdOrData;
+    } else {
+      payload = { userId: userIdOrData, permissionLevel };
+    }
+    return apiRequest<DatacenterUser>(`/api/datacenters/${datacenterId}/users`, {
       method: 'POST',
-      body: JSON.stringify(data),
-    }),
+      body: JSON.stringify(payload),
+    });
+  },
 
   removeUser: (datacenterId: number, userId: number) =>
     apiRequest<void>(`/api/datacenters/${datacenterId}/users/${userId}`, {
@@ -119,6 +138,18 @@ export const foldersApi = {
       body: JSON.stringify(data),
     }),
 
+  createFolder: (datacenterId: number, name: string) =>
+    apiRequest<Folder>(`/api/datacenters/${datacenterId}/folders`, {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+
+  createDevice: (folderId: number, data: any) =>
+    apiRequest<Device>(`/api/folders/${folderId}/devices`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   delete: (folderId: number, force = false) =>
     apiRequest<void>(`/api/folders/${folderId}?force=${force}`, {
       method: 'DELETE',
@@ -139,6 +170,12 @@ export const devicesApi = {
     apiRequest<Device>(`/api/devices/${deviceId}`),
 
   create: (folderId: number, data: any) =>
+    apiRequest<Device>(`/api/folders/${folderId}/devices`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  createDevice: (folderId: number, data: any) =>
     apiRequest<Device>(`/api/folders/${folderId}/devices`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -183,18 +220,30 @@ export const usersApi = {
 
 // Excel Import API
 export const importApi = {
-  preview: (file: File) => {
+  preview: (file: File, folderId?: number) => {
     const formData = new FormData();
     formData.append('file', file);
-    return apiRequest<{ filename: string; previewRows: ImportPreviewRow[] }>(
+    if (folderId) formData.append('folderId', folderId.toString());
+    return apiRequest<ImportPreviewRow[] | { filename: string; previewRows: ImportPreviewRow[] }>(
       '/api/import/preview',
       { method: 'POST', body: formData }
-    );
+    ).then((res: any) => {
+      if (Array.isArray(res)) return res;
+      if (res && Array.isArray(res.previewRows)) return res.previewRows;
+      return [];
+    });
   },
 
-  commit: (datacenterId: number, folderName: string, previewRows: ImportPreviewRow[]) =>
-    apiRequest<{ importedCount: number; message: string }>('/api/import/commit', {
+  commit: (datacenterIdOrFolderId: number, previewRowsOrFolderName: any, previewRowsArg?: any) => {
+    let payload = {};
+    if (Array.isArray(previewRowsOrFolderName)) {
+      payload = { folderId: datacenterIdOrFolderId, previewRows: previewRowsOrFolderName };
+    } else {
+      payload = { datacenterId: datacenterIdOrFolderId, folderName: previewRowsOrFolderName, previewRows: previewRowsArg };
+    }
+    return apiRequest<{ importedCount: number; message: string }>('/api/import/commit', {
       method: 'POST',
-      body: JSON.stringify({ datacenterId, folderName, previewRows }),
-    }),
+      body: JSON.stringify(payload),
+    });
+  },
 };
