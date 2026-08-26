@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Server, Plus, ShieldAlert, Lock, Trash2, Sliders } from 'lucide-react';
+import { Server, Plus, ShieldAlert, Lock, Trash2 } from 'lucide-react';
 import { foldersApi } from '../services/api';
 
 interface CreateDeviceModalProps {
@@ -45,8 +45,8 @@ export const CreateDeviceModal: React.FC<CreateDeviceModalProps> = ({
     }
   };
 
-  const handleAddCustomField = (presetKey = '', presetValue = '') => {
-    setCustomFields((prev) => [...prev, { key: presetKey, value: presetValue }]);
+  const handleAddField = () => {
+    setCustomFields((prev) => [...prev, { key: '', value: '' }]);
   };
 
   const handleCustomFieldChange = (index: number, field: 'key' | 'value', val: string) => {
@@ -103,7 +103,7 @@ export const CreateDeviceModal: React.FC<CreateDeviceModalProps> = ({
           <div
             className="modal-body"
             style={{
-              overflowY: 'scroll',
+              overflowY: 'auto',
               maxHeight: 'calc(88vh - 130px)',
               padding: '24px',
             }}
@@ -228,62 +228,53 @@ export const CreateDeviceModal: React.FC<CreateDeviceModalProps> = ({
 
             <hr style={{ borderColor: 'var(--border-color)', margin: '20px 0' }} />
 
-            {/* Dynamic Custom Fields Section */}
-            <div className="card mb-4" style={{ backgroundColor: '#0f172a', border: '1px solid var(--primary)' }}>
-              <div className="card-body">
-                <div className="flex-between mb-2">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Sliders size={16} color="var(--primary)" />
-                    <h4 style={{ fontSize: '13px', color: 'var(--primary)', margin: 0, fontWeight: 700 }}>
-                      Dynamic Custom Fields & Extra Attributes
-                    </h4>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={() => handleAddCustomField()}
-                  >
-                    <Plus size={14} /> <span>Add Dynamic Field</span>
-                  </button>
-                </div>
-
-                <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Quick Presets:</span>
-                  <button type="button" className="btn btn-secondary btn-sm py-0 px-2" style={{ fontSize: '11px' }} onClick={() => handleAddCustomField('username', '')}>+ Username</button>
-                  <button type="button" className="btn btn-secondary btn-sm py-0 px-2" style={{ fontSize: '11px' }} onClick={() => handleAddCustomField('vcenter service', '')}>+ vCenter Service</button>
-                  <button type="button" className="btn btn-secondary btn-sm py-0 px-2" style={{ fontSize: '11px' }} onClick={() => handleAddCustomField('vmcleaner', '')}>+ VM Cleaner</button>
-                  <button type="button" className="btn btn-secondary btn-sm py-0 px-2" style={{ fontSize: '11px' }} onClick={() => handleAddCustomField('comment', '')}>+ Comment</button>
-                </div>
-
-                {customFields.map((cf, index) => (
-                  <div key={index} style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Field Name (e.g. username, vcenter service)"
-                      style={{ flex: '1' }}
-                      value={cf.key}
-                      onChange={(e) => handleCustomFieldChange(index, 'key', e.target.value)}
-                    />
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Field Value (e.g. root, admin@domain)"
-                      style={{ flex: '1.5' }}
-                      value={cf.value}
-                      onChange={(e) => handleCustomFieldChange(index, 'value', e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-danger btn-sm p-1"
-                      onClick={() => handleRemoveCustomField(index)}
-                      title="Remove field"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))}
+            {/* Custom User-Defined Fields */}
+            <div className="mb-4">
+              <div className="flex-between mb-2">
+                <h4 style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, fontWeight: 600 }}>
+                  Custom Fields (User-Defined)
+                </h4>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleAddField}
+                >
+                  <Plus size={14} /> <span>Add Field</span>
+                </button>
               </div>
+
+              {customFields.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
+                  {customFields.map((cf, index) => (
+                    <div key={index} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Field Name (e.g. vcenter service, comment, vmcleaner)"
+                        style={{ flex: '1' }}
+                        value={cf.key}
+                        onChange={(e) => handleCustomFieldChange(index, 'key', e.target.value)}
+                      />
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Field Value"
+                        style={{ flex: '1.5' }}
+                        value={cf.value}
+                        onChange={(e) => handleCustomFieldChange(index, 'value', e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-sm p-1"
+                        onClick={() => handleRemoveCustomField(index)}
+                        title="Remove field"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <hr style={{ borderColor: 'var(--border-color)', margin: '20px 0' }} />
