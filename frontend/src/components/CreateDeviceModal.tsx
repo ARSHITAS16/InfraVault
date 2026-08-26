@@ -31,9 +31,7 @@ export const CreateDeviceModal: React.FC<CreateDeviceModalProps> = ({
     passphrase: '',
   });
 
-  const [customFields, setCustomFields] = useState<{ key: string; value: string }[]>([
-    { key: '', value: '' }
-  ]);
+  const [customFields, setCustomFields] = useState<{ key: string; value: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
