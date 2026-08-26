@@ -1,0 +1,4 @@
+Hostname,Model,Serial_Number,Capacity,Service_Tag,Support_EOD,iDRAC_Password,Sysadmin_Password,Secoff_Password,Passphrase
+sjc51-c01-dds01,DataDomain DD9400,SN-9948271-SJ,256TB,7X889K1,2028-12-31,idrac_Secret_2026!,sysadmin_Secret_2026!,secoff_Secret_2026!,passphrase_Secret_2026!
+sjc51-c01-esx01,Dell PowerEdge R750,SN-3394812-SJ,512GB RAM,9B4412K,2027-06-30,esx_idrac_Secret!,esx_sysadmin_Secret!,esx_secoff_Secret!,esx_passphrase_Secret!
+iad51-c01-dds02,DataDomain DD3300,APM00184509729,128TB,4371,2027-12-03,idrac_iad_Secret!,sysadmin_iad_Secret!,secoff_iad_Secret!,passphrase_iad_Secret!

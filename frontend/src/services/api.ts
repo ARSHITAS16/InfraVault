@@ -197,13 +197,19 @@ export const devicesApi = {
     }),
 };
 
-// Credential Reveal API
+// Credential Reveal & Create API
 export const credentialsApi = {
   reveal: (credentialId: number, datacenterId: number) =>
     apiRequest<{ id: number; type: string; secret: string }>(
       `/api/credentials/${credentialId}/reveal?datacenterId=${datacenterId}`,
       { method: 'POST' }
     ),
+
+  create: (deviceId: number, type: string, username: string, password?: string) =>
+    apiRequest<{ message: string }>('/api/credentials/create', {
+      method: 'POST',
+      body: JSON.stringify({ deviceId, type, username, password }),
+    }),
 };
 
 // Audit Log API

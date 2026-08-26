@@ -16,11 +16,12 @@ import {
   ShieldCheck,
   FileSpreadsheet,
   AlertTriangle,
+  Key,
 } from 'lucide-react';
 import { Datacenter, Folder as FolderType, Device, CredentialMasked } from '../types';
 import { SidebarTree, TreeDataNode } from '../components/SidebarTree';
 import { CredentialField } from '../components/CredentialField';
-import { devicesApi } from '../services/api';
+import { devicesApi, credentialsApi } from '../services/api';
 
 interface InventoryViewProps {
   treeData: TreeDataNode[];
@@ -53,7 +54,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [credentials, setCredentials] = useState<CredentialMasked[]>([]);
   const [loadingCreds, setLoadingCreds] = useState(false);
 
-  useEffect(() => {
+  // Dynamic inline secret creation
+  const [showAddSecret, setShowAddSecret] = useState(false);
+  const [newSecretType, setNewSecretType] = useState('');
+  const [newSecretUser, setNewSecretUser] = useState('root');
+  const [newSecretPass, setNewSecretPass] = useState('');
+  const [savingSecret, setSavingSecret] = useState(false);
+
+  const loadCredentials = () => {
     if (selectedNode && selectedNode.type === 'device') {
       setLoadingCreds(true);
       devicesApi
@@ -62,7 +70,36 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         .catch(() => setCredentials([]))
         .finally(() => setLoadingCreds(false));
     }
+  };
+
+  useEffect(() => {
+    loadCredentials();
+    setShowAddSecret(false);
   }, [selectedNode]);
+
+  const handleAddSecretSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSecretType.trim() || !selectedNode || selectedNode.type !== 'device') return;
+
+    try {
+      setSavingSecret(true);
+      await credentialsApi.create(
+        selectedNode.numericId,
+        newSecretType.trim(),
+        newSecretUser.trim() || 'root',
+        newSecretPass
+      );
+      setNewSecretType('');
+      setNewSecretUser('root');
+      setNewSecretPass('');
+      setShowAddSecret(false);
+      loadCredentials();
+    } catch (err: any) {
+      alert(err.message || 'Failed to add encrypted secret');
+    } finally {
+      setSavingSecret(false);
+    }
+  };
 
   if (!selectedNode) {
     return (
@@ -78,125 +115,155 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           onDeleteNode={onDeleteNode}
         />
         <div className="infravault-main-panel empty-selection-panel">
-          <Database size={48} className="text-muted mb-3" />
-          <h3>No Inventory Item Selected</h3>
-          <p className="text-muted">
-            Select a Datacenter, Folder, or Host from the left inventory tree to view details and secrets.
-          </p>
+          <div className="empty-state">
+            <Database size={48} className="text-muted mb-3" />
+            <h3>No Inventory Item Selected</h3>
+            <p className="text-muted">
+              Select a Datacenter, Folder, or Host from the left inventory tree to view details and secrets.
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="infravault-split-layout">
-      <SidebarTree
-        treeData={treeData}
-        selectedNodeId={selectedNode.id}
-        onSelectNode={onSelectNode}
-        onAddFolder={onAddFolder}
-        onAddDevice={onAddDevice}
-        onManageUsers={onManageUsers}
-        onCopyPermissions={onCopyPermissions}
-        onDeleteNode={onDeleteNode}
-      />
+    <div className="infravault-inventory-split">
+      <div className="inventory-sidebar">
+        <div className="sidebar-header">
+          <span>Infrastructure Tree</span>
+        </div>
+        <div className="sidebar-content">
+          <SidebarTree
+            treeData={treeData}
+            selectedNodeId={selectedNode.id}
+            onSelectNode={onSelectNode}
+            onAddFolder={onAddFolder}
+            onAddDevice={onAddDevice}
+            onManageUsers={onManageUsers}
+            onCopyPermissions={onCopyPermissions}
+            onDeleteNode={onDeleteNode}
+          />
+        </div>
+      </div>
 
-      <div className="infravault-main-panel">
-        {/* Top Detail Header */}
-        <div className="main-panel-header">
-          <div className="panel-title-area">
-            {selectedNode.type === 'datacenter' && <Database size={24} className="text-primary mr-2" />}
-            {selectedNode.type === 'folder' && <Folder size={24} className="text-warning mr-2" />}
-            {selectedNode.type === 'device' && <Server size={24} className="text-success mr-2" />}
-
+      <div className="inventory-details-pane">
+        <div className="details-pane-header flex-between p-3 border-bottom">
+          <div className="flex-align">
+            {selectedNode.type === 'datacenter' && <Database size={20} className="text-primary mr-2" />}
+            {selectedNode.type === 'folder' && <Folder size={20} className="text-warning mr-2" />}
+            {selectedNode.type === 'device' && <Server size={20} className="text-success mr-2" />}
             <div>
-              <h2 className="panel-item-name">{selectedNode.name}</h2>
-              <span className="panel-item-type">
-                Type: <strong>{selectedNode.type.toUpperCase()}</strong>
+              <h3 className="m-0 font-weight-bold">{selectedNode.name}</h3>
+              <span className="text-muted text-capitalize" style={{ fontSize: '11px' }}>
+                {selectedNode.type} Node #{selectedNode.numericId}
               </span>
             </div>
           </div>
 
-          <div className="panel-actions">
+          <div className="flex-align gap-2">
             {selectedNode.type === 'datacenter' && (
               <>
-                <button className="btn btn-secondary btn-sm" onClick={() => onAddFolder(selectedNode.numericId)}>
-                  <Plus size={15} /> <span>New Folder</span>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => onManageUsers(selectedNode.numericId)}
+                >
+                  <Users size={14} /> Access Management
                 </button>
-                <button className="btn btn-secondary btn-sm" onClick={() => onManageUsers(selectedNode.numericId)}>
-                  <Users size={15} /> <span>User Access & Copy Permissions</span>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => onCopyPermissions(selectedNode.numericId)}
+                >
+                  <Copy size={14} /> Copy Permissions
+                </button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => onAddFolder(selectedNode.numericId)}
+                >
+                  <Plus size={14} /> Add Folder
                 </button>
               </>
             )}
 
             {selectedNode.type === 'folder' && (
               <>
-                <button className="btn btn-primary btn-sm" onClick={() => onAddDevice(selectedNode.numericId)}>
-                  <Plus size={15} /> <span>Add Host</span>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => onOpenImport(selectedNode.numericId)}
+                >
+                  <FileSpreadsheet size={14} /> Import Excel
                 </button>
-                <button className="btn btn-secondary btn-sm" onClick={() => onOpenImport(selectedNode.numericId)}>
-                  <Upload size={15} /> <span>Bulk Excel Import</span>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => onAddDevice(selectedNode.numericId)}
+                >
+                  <Plus size={14} /> Add Host
+                </button>
+                <button
+                  className="btn btn-danger btn-sm p-1"
+                  onClick={() => onDeleteNode(selectedNode)}
+                  title="Delete Folder"
+                >
+                  <Trash2 size={14} />
                 </button>
               </>
             )}
 
-            <button className="btn btn-danger-outline btn-sm" onClick={() => onDeleteNode(selectedNode)}>
-              <Trash2 size={15} /> <span>Delete {selectedNode.type}</span>
-            </button>
+            {selectedNode.type === 'device' && (
+              <button
+                className="btn btn-danger btn-sm p-1"
+                onClick={() => onDeleteNode(selectedNode)}
+                title="Delete Host"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="infravault-tabs">
-          <button
-            className={`infravault-tab ${activeTab === 'summary' ? 'active' : ''}`}
-            onClick={() => setActiveTab('summary')}
-          >
-            Summary & Specifications
-          </button>
-
-          {selectedNode.type === 'device' && (
+        {selectedNode.type === 'device' && (
+          <div className="details-pane-tabs px-3 border-bottom flex-align gap-3">
             <button
-              className={`infravault-tab ${activeTab === 'credentials' ? 'active' : ''}`}
+              className={`subnav-btn ${activeTab === 'summary' ? 'active' : ''}`}
+              onClick={() => setActiveTab('summary')}
+            >
+              Hardware Specifications
+            </button>
+            <button
+              className={`subnav-btn ${activeTab === 'credentials' ? 'active' : ''}`}
               onClick={() => setActiveTab('credentials')}
             >
-              Encrypted Passwords & Secrets
+              Encrypted Passwords ({credentials.length})
             </button>
-          )}
+          </div>
+        )}
 
-          {selectedNode.type === 'datacenter' && (
-            <button
-              className={`infravault-tab ${activeTab === 'permissions' ? 'active' : ''}`}
-              onClick={() => onManageUsers(selectedNode.numericId)}
-            >
-              User Access Control
-            </button>
-          )}
-        </div>
-
-        {/* Tab Contents */}
-        <div className="panel-tab-body">
+        <div className="details-pane-body p-4">
           {activeTab === 'summary' && (
             <div className="summary-tab-content">
               {selectedNode.type === 'datacenter' && (
-                <div className="datacenter-detail-card">
-                  <h4>Datacenter Metadata</h4>
-                  <div className="grid-2 mt-3">
-                    <div className="info-row">
-                      <span className="info-label">Name:</span>
-                      <span className="info-val">{selectedNode.name}</span>
+                <div className="dc-summary-card">
+                  <h4>Datacenter Overview</h4>
+                  <p className="text-muted mb-4">{selectedNode.description || 'Primary Datacenter Location'}</p>
+
+                  <div className="grid-3 mb-4">
+                    <div className="spec-item">
+                      <span className="spec-label">Datacenter ID</span>
+                      <span className="spec-value">#{selectedNode.numericId}</span>
                     </div>
-                    <div className="info-row">
-                      <span className="info-label">Description:</span>
-                      <span className="info-val">{selectedNode.description || 'N/A'}</span>
+
+                    <div className="spec-item">
+                      <span className="spec-label">Child Folders</span>
+                      <span className="spec-value">{selectedNode.children?.length || 0} Folders</span>
                     </div>
-                    <div className="info-row">
-                      <span className="info-label">Child Folders:</span>
-                      <span className="info-val">{selectedNode.children?.length || 0} Folders</span>
+
+                    <div className="spec-item">
+                      <span className="spec-label">Security Protocol</span>
+                      <span className="spec-value text-success font-weight-bold">AES-256-GCM</span>
                     </div>
                   </div>
 
-                  <div className="mt-4">
+                  <div className="card-body bg-dark border rounded p-3 mb-3">
                     <div className="flex-between mb-2">
                       <span className="font-weight-bold">Child Folders in {selectedNode.name}</span>
                       <button className="btn btn-primary btn-sm" onClick={() => onAddFolder(selectedNode.numericId)}>
@@ -361,10 +428,71 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     );
                   })()}
 
-                  <div className="section-title text-primary mt-4 mb-3 flex-align">
-                    <Lock size={16} className="mr-2" />
-                    <span>Encrypted Infrastructure Passwords</span>
+                  <div className="flex-between mt-4 mb-3">
+                    <div className="section-title text-primary m-0 flex-align">
+                      <Lock size={16} className="mr-2" />
+                      <span>Encrypted Infrastructure Passwords</span>
+                    </div>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => setShowAddSecret(!showAddSecret)}
+                    >
+                      <Plus size={14} /> Add Secret Field
+                    </button>
                   </div>
+
+                  {showAddSecret && (
+                    <form onSubmit={handleAddSecretSubmit} className="card p-3 mb-4" style={{ backgroundColor: '#0b1120', border: '1px solid var(--primary)' }}>
+                      <h4 style={{ fontSize: '13px', color: 'var(--primary)', marginBottom: '10px' }}>
+                        Add New Encrypted Secret Field
+                      </h4>
+                      <div className="grid-3 mb-3">
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label">Secret Type / Label:*</label>
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="e.g. vCenter Service, VM Cleaner, Custom API"
+                            value={newSecretType}
+                            onChange={(e) => setNewSecretType(e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label">Username:</label>
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="e.g. root or sysadmin"
+                            value={newSecretUser}
+                            onChange={(e) => setNewSecretUser(e.target.value)}
+                          />
+                        </div>
+
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label">Password / Secret:*</label>
+                          <input
+                            type="password"
+                            className="form-control"
+                            placeholder="Enter plaintext secret"
+                            value={newSecretPass}
+                            onChange={(e) => setNewSecretPass(e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex-align gap-2 justify-content-end">
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowAddSecret(false)}>
+                          Cancel
+                        </button>
+                        <button type="submit" className="btn btn-primary btn-sm" disabled={savingSecret || !newSecretType.trim()}>
+                          {savingSecret ? <span className="spinner"></span> : <><Key size={14} /> Save Secret</>}
+                        </button>
+                      </div>
+                    </form>
+                  )}
 
                   {loadingCreds ? (
                     <div className="text-center py-4"><span className="spinner"></span> Loading secrets...</div>
@@ -390,12 +518,74 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
           {activeTab === 'credentials' && selectedNode.type === 'device' && (
             <div className="credentials-tab-content">
-              <div className="alert alert-warning mb-3 flex-align">
-                <ShieldCheck size={18} className="mr-2" />
-                <span>
-                  All credentials below are encrypted with <strong>AES-256-GCM</strong>. Plaintext passwords are revealed temporarily and logged to the security audit trail.
-                </span>
+              <div className="flex-between mb-3">
+                <div className="alert alert-warning m-0 flex-align flex-1 mr-3">
+                  <ShieldCheck size={18} className="mr-2" />
+                  <span>
+                    All credentials below are encrypted with <strong>AES-256-GCM</strong>. Plaintext passwords are revealed temporarily and logged to the security audit trail.
+                  </span>
+                </div>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setShowAddSecret(!showAddSecret)}
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  <Plus size={14} /> Add Secret Field
+                </button>
               </div>
+
+              {showAddSecret && (
+                <form onSubmit={handleAddSecretSubmit} className="card p-3 mb-4" style={{ backgroundColor: '#0b1120', border: '1px solid var(--primary)' }}>
+                  <h4 style={{ fontSize: '13px', color: 'var(--primary)', marginBottom: '10px' }}>
+                    Add New Encrypted Secret Field
+                  </h4>
+                  <div className="grid-3 mb-3">
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Secret Type / Label:*</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="e.g. vCenter Service, VM Cleaner, Custom API"
+                        value={newSecretType}
+                        onChange={(e) => setNewSecretType(e.target.value)}
+                        required
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Username:</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="e.g. root or sysadmin"
+                        value={newSecretUser}
+                        onChange={(e) => setNewSecretUser(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Password / Secret:*</label>
+                      <input
+                        type="password"
+                        className="form-control"
+                        placeholder="Enter plaintext secret"
+                        value={newSecretPass}
+                        onChange={(e) => setNewSecretPass(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex-align gap-2 justify-content-end">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowAddSecret(false)}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary btn-sm" disabled={savingSecret || !newSecretType.trim()}>
+                      {savingSecret ? <span className="spinner"></span> : <><Key size={14} /> Save Secret</>}
+                    </button>
+                  </div>
+                </form>
+              )}
 
               {loadingCreds ? (
                 <div className="text-center py-4"><span className="spinner"></span> Loading secrets...</div>
