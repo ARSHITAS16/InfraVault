@@ -223,9 +223,9 @@ export const importApi = {
   preview: (file: File, folderId?: number) => {
     const formData = new FormData();
     formData.append('file', file);
-    if (folderId) formData.append('folderId', folderId.toString());
+    const targetFolderId = folderId || 1;
     return apiRequest<ImportPreviewRow[] | { filename: string; previewRows: ImportPreviewRow[] }>(
-      '/api/import/preview',
+      `/api/import/preview?folderId=${targetFolderId}`,
       { method: 'POST', body: formData }
     ).then((res: any) => {
       if (Array.isArray(res)) return res;
@@ -234,16 +234,24 @@ export const importApi = {
     });
   },
 
-  commit: (datacenterIdOrFolderId: number, previewRowsOrFolderName: any, previewRowsArg?: any) => {
-    let payload = {};
-    if (Array.isArray(previewRowsOrFolderName)) {
-      payload = { folderId: datacenterIdOrFolderId, previewRows: previewRowsOrFolderName };
-    } else {
-      payload = { datacenterId: datacenterIdOrFolderId, folderName: previewRowsOrFolderName, previewRows: previewRowsArg };
+  commit: (folderIdOrData: any, rowsOrData?: any) => {
+    let folderId = 1;
+    let rows = [];
+
+    if (typeof folderIdOrData === 'number') {
+      folderId = folderIdOrData;
+      rows = rowsOrData || [];
+    } else if (typeof folderIdOrData === 'object' && folderIdOrData !== null) {
+      folderId = folderIdOrData.folderId || 1;
+      rows = folderIdOrData.previewRows || folderIdOrData.rows || [];
     }
-    return apiRequest<{ importedCount: number; message: string }>('/api/import/commit', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
+
+    return apiRequest<{ importedCount: number; message: string }>(
+      `/api/import/commit?folderId=${folderId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(rows),
+      }
+    );
   },
 };
