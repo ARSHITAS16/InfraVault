@@ -73,6 +73,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   useEffect(() => {
+    if (selectedNode && selectedNode.type !== 'device') {
+      setActiveTab('summary');
+    }
     loadCredentials();
     setShowAddSecret(false);
   }, [selectedNode]);
@@ -213,19 +216,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
         {/* Tab Contents */}
         <div className="panel-tab-body">
-          {activeTab === 'summary' && (
+          {(activeTab === 'summary' || selectedNode.type !== 'device') && (
             <div className="summary-tab-content">
               {selectedNode.type === 'datacenter' && (
                 <div className="datacenter-detail-card">
                   <h4>Datacenter Metadata</h4>
-                  <div className="grid-2 mt-3">
+                  <div className="grid-2 mt-3 mb-4">
                     <div className="info-row">
                       <span className="info-label">Name:</span>
                       <span className="info-val">{selectedNode.name}</span>
                     </div>
                     <div className="info-row">
                       <span className="info-label">Description:</span>
-                      <span className="info-val">{selectedNode.description || 'N/A'}</span>
+                      <span className="info-val">{selectedNode.description || 'Primary Datacenter Location'}</span>
                     </div>
                     <div className="info-row">
                       <span className="info-label">Child Folders:</span>
