@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import './App.css';
 import { Datacenter, Folder, Device } from './types';
-import { datacentersApi, foldersApi } from './services/api';
+import { datacentersApi, foldersApi, devicesApi } from './services/api';
 import { Navbar } from './components/Navbar';
 import { TreeDataNode } from './components/SidebarTree';
 import { Login } from './pages/Login';
@@ -42,6 +42,17 @@ export default function App() {
     targetDc?: Datacenter;
   }>({ type: null });
 
+  const findNodeById = (nodes: TreeDataNode[], id: string): TreeDataNode | null => {
+    for (const n of nodes) {
+      if (n.id === id) return n;
+      if (n.children) {
+        const res = findNodeById(n.children, id);
+        if (res) return res;
+      }
+    }
+    return null;
+  };
+
   const loadFullInventory = useCallback(async () => {
     if (!token) return;
 
@@ -50,69 +61,70 @@ export default function App() {
       const dcs = await datacentersApi.getDatacenters();
       setDatacenters(dcs);
 
-      const treeNodes: TreeDataNode[] = [];
       const allFetchedFolders: Folder[] = [];
 
-      for (const dc of dcs) {
-        let dcFolders: Folder[] = [];
-        try {
-          dcFolders = await datacentersApi.getFolders(dc.id);
-        } catch {
-          dcFolders = [];
-        }
-        allFetchedFolders.push(...dcFolders);
-
-        const folderNodes: TreeDataNode[] = [];
-        for (const f of dcFolders) {
-          let devices: Device[] = [];
+      const treeNodes: TreeDataNode[] = await Promise.all(
+        dcs.map(async (dc) => {
+          let dcFolders: Folder[] = [];
           try {
-            devices = await foldersApi.getDevices(f.id);
+            dcFolders = await datacentersApi.getFolders(dc.id);
           } catch {
-            devices = [];
+            dcFolders = [];
           }
+          allFetchedFolders.push(...dcFolders);
 
-          const deviceNodes: TreeDataNode[] = devices.map((d) => ({
-            type: 'device',
-            id: `device-${d.id}`,
-            numericId: d.id,
-            name: d.hostname,
+          const folderNodes: TreeDataNode[] = await Promise.all(
+            dcFolders.map(async (f) => {
+              let devices: Device[] = [];
+              try {
+                devices = await foldersApi.getDevices(f.id);
+              } catch {
+                devices = [];
+              }
+
+              const deviceNodes: TreeDataNode[] = devices.map((d) => ({
+                type: 'device',
+                id: `device-${d.id}`,
+                numericId: d.id,
+                name: d.hostname,
+                datacenterId: dc.id,
+                rawObject: d,
+              }));
+
+              return {
+                type: 'folder',
+                id: `folder-${f.id}`,
+                numericId: f.id,
+                name: f.name,
+                datacenterId: dc.id,
+                children: deviceNodes,
+                rawObject: f,
+              };
+            })
+          );
+
+          return {
+            type: 'datacenter',
+            id: `dc-${dc.id}`,
+            numericId: dc.id,
+            name: dc.name,
             datacenterId: dc.id,
-            rawObject: d,
-          }));
-
-          folderNodes.push({
-            type: 'folder',
-            id: `folder-${f.id}`,
-            numericId: f.id,
-            name: f.name,
-            datacenterId: dc.id,
-            children: deviceNodes,
-            rawObject: f,
-          });
-        }
-
-        treeNodes.push({
-          type: 'datacenter',
-          id: `dc-${dc.id}`,
-          numericId: dc.id,
-          name: dc.name,
-          datacenterId: dc.id,
-          description: dc.description,
-          children: folderNodes,
-          rawObject: dc,
-        });
-      }
+            description: dc.description,
+            children: folderNodes,
+            rawObject: dc,
+          };
+        })
+      );
 
       setFolders(allFetchedFolders);
       setTreeData(treeNodes);
 
-      // Restore or auto-select first DC node if none selected
-      if (!selectedNode && treeNodes.length > 0) {
-        setSelectedNode(treeNodes[0]);
-      } else if (selectedNode) {
-        // Refresh selected node state
-        const found = findNodeById(treeNodes, selectedNode.id);
-        if (found) setSelectedNode(found);
+      if (treeNodes.length > 0) {
+        setSelectedNode((prev) => {
+          if (!prev) return treeNodes[0];
+          const found = findNodeById(treeNodes, prev.id);
+          return found || treeNodes[0];
+        });
       }
     } catch (err: any) {
       console.error('Failed to load inventory:', err);
@@ -126,17 +138,6 @@ export default function App() {
       loadFullInventory();
     }
   }, [token, loadFullInventory]);
-
-  const findNodeById = (nodes: TreeDataNode[], id: string): TreeDataNode | null => {
-    for (const n of nodes) {
-      if (n.id === id) return n;
-      if (n.children) {
-        const res = findNodeById(n.children, id);
-        if (res) return res;
-      }
-    }
-    return null;
-  };
 
   const handleLoginSuccess = (newToken: string, newUsername: string, newUserId: number, newRole: string) => {
     localStorage.setItem('token', newToken);
@@ -181,7 +182,6 @@ export default function App() {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
-  // Count total devices
   let totalDevices = 0;
   treeData.forEach((dc) => {
     dc.children?.forEach((f) => {
