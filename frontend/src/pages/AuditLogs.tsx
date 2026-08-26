@@ -16,6 +16,24 @@ export const AuditLogs: React.FC = () => {
       .finally(() => setLoading(false));
   }, []);
 
+  const formatIST = (timestampStr: string) => {
+    if (!timestampStr) return '-';
+    try {
+      return new Date(timestampStr).toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+      }) + ' IST';
+    } catch {
+      return timestampStr;
+    }
+  };
+
   const filteredLogs = logs.filter(
     (l) =>
       l.username.toLowerCase().includes(search.toLowerCase()) ||
@@ -30,7 +48,7 @@ export const AuditLogs: React.FC = () => {
         <div>
           <h2>Security & Operations Audit Trail</h2>
           <p className="text-muted">
-            Immutable log of all login, secret reveal, device modifications, and datacenter permission copy events.
+            Immutable log of all login, secret reveal, device modifications, and datacenter permission copy events (Indian Standard Time - IST).
           </p>
         </div>
 
@@ -52,7 +70,7 @@ export const AuditLogs: React.FC = () => {
             <table className="infravault-table">
               <thead>
                 <tr>
-                  <th>Timestamp</th>
+                  <th>Timestamp (IST)</th>
                   <th>User</th>
                   <th>Action</th>
                   <th>Entity Type</th>
@@ -77,7 +95,7 @@ export const AuditLogs: React.FC = () => {
                 ) : (
                   filteredLogs.map((log) => (
                     <tr key={log.id}>
-                      <td>{new Date(log.timestamp).toLocaleString()}</td>
+                      <td><span className="badge badge-secondary">{formatIST(log.timestamp)}</span></td>
                       <td><strong>{log.username}</strong></td>
                       <td>
                         <span
