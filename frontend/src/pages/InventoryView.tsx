@@ -227,13 +227,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               className={`subnav-btn ${activeTab === 'summary' ? 'active' : ''}`}
               onClick={() => setActiveTab('summary')}
             >
-              Hardware Specifications
+              Summary & Specifications
             </button>
             <button
               className={`subnav-btn ${activeTab === 'credentials' ? 'active' : ''}`}
               onClick={() => setActiveTab('credentials')}
             >
-              Encrypted Passwords ({credentials.length})
+              Encrypted Passwords & Secrets ({credentials.length})
             </button>
           </div>
         )}
@@ -509,6 +509,29 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           datacenterId={selectedNode.datacenterId}
                         />
                       ))}
+                      <div
+                        className="credential-row-card"
+                        style={{
+                          border: '2px dashed var(--primary)',
+                          backgroundColor: 'rgba(2, 132, 199, 0.08)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minHeight: '140px',
+                          cursor: 'pointer',
+                          borderRadius: 'var(--radius-md)',
+                        }}
+                        onClick={() => setShowAddSecret(true)}
+                      >
+                        <Plus size={24} color="var(--primary)" />
+                        <span style={{ fontWeight: 700, color: 'var(--primary)', marginTop: '8px', fontSize: '13px' }}>
+                          + Add Credential Field
+                        </span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          vCenter, VM Cleaner, or Custom Secret
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -602,6 +625,31 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       datacenterId={selectedNode.datacenterId}
                     />
                   ))}
+                  
+                  {/* Built-in Add Credential Field Card */}
+                  <div
+                    className="credential-row-card"
+                    style={{
+                      border: '2px dashed var(--primary)',
+                      backgroundColor: 'rgba(2, 132, 199, 0.08)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minHeight: '140px',
+                      cursor: 'pointer',
+                      borderRadius: 'var(--radius-md)',
+                    }}
+                    onClick={() => setShowAddSecret(true)}
+                  >
+                    <Plus size={24} color="var(--primary)" />
+                    <span style={{ fontWeight: 700, color: 'var(--primary)', marginTop: '8px', fontSize: '13px' }}>
+                      + Add Credential Field
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      vCenter, VM Cleaner, or Custom Secret
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
