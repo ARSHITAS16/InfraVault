@@ -73,12 +73,16 @@ export const authApi = {
 // Datacenter APIs
 export const datacentersApi = {
   getAll: () => apiRequest<Datacenter[]>('/api/datacenters'),
+  getDatacenters: () => apiRequest<Datacenter[]>('/api/datacenters'),
 
   create: (data: { name: string; description?: string }) =>
     apiRequest<Datacenter>('/api/datacenters', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  getFolders: (datacenterId: number) =>
+    apiRequest<Folder[]>(`/api/datacenters/${datacenterId}/folders`),
 
   getUsers: (datacenterId: number) =>
     apiRequest<DatacenterUser[]>(`/api/datacenters/${datacenterId}/users`),
@@ -106,6 +110,9 @@ export const foldersApi = {
   getByDatacenter: (datacenterId: number) =>
     apiRequest<Folder[]>(`/api/datacenters/${datacenterId}/folders`),
 
+  getDevices: (folderId: number) =>
+    apiRequest<Device[]>(`/api/folders/${folderId}/devices`),
+
   create: (datacenterId: number, data: { name: string }) =>
     apiRequest<Folder>(`/api/datacenters/${datacenterId}/folders`, {
       method: 'POST',
@@ -113,6 +120,11 @@ export const foldersApi = {
     }),
 
   delete: (folderId: number, force = false) =>
+    apiRequest<void>(`/api/folders/${folderId}?force=${force}`, {
+      method: 'DELETE',
+    }),
+
+  deleteFolder: (folderId: number, force = false) =>
     apiRequest<void>(`/api/folders/${folderId}?force=${force}`, {
       method: 'DELETE',
     }),
@@ -141,6 +153,11 @@ export const devicesApi = {
     apiRequest<void>(`/api/devices/${deviceId}`, {
       method: 'DELETE',
     }),
+
+  deleteDevice: (deviceId: number) =>
+    apiRequest<void>(`/api/devices/${deviceId}`, {
+      method: 'DELETE',
+    }),
 };
 
 // Credential Reveal API
@@ -155,11 +172,13 @@ export const credentialsApi = {
 // Audit Log API
 export const auditApi = {
   getLogs: () => apiRequest<AuditLog[]>('/api/audit'),
+  getAuditLogs: () => apiRequest<AuditLog[]>('/api/audit'),
 };
 
 // Users API
 export const usersApi = {
   getAll: () => apiRequest<User[]>('/api/users'),
+  getAllUsers: () => apiRequest<User[]>('/api/users'),
 };
 
 // Excel Import API
