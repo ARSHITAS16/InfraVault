@@ -122,6 +122,16 @@ export const datacentersApi = {
       `/api/datacenters/${targetDatacenterId}/copy-permissions?sourceId=${sourceDatacenterId}`,
       { method: 'POST' }
     ),
+
+  delete: (datacenterId: number) =>
+    apiRequest<void>(`/api/datacenters/${datacenterId}`, {
+      method: 'DELETE',
+    }),
+
+  deleteDatacenter: (datacenterId: number) =>
+    apiRequest<void>(`/api/datacenters/${datacenterId}`, {
+      method: 'DELETE',
+    }),
 };
 
 // Folder APIs

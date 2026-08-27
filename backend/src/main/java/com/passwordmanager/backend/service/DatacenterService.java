@@ -11,6 +11,7 @@ import com.passwordmanager.backend.entity.PermissionLevel;
 import com.passwordmanager.backend.entity.User;
 import com.passwordmanager.backend.repository.DatacenterRepository;
 import com.passwordmanager.backend.repository.DatacenterUserRepository;
+import com.passwordmanager.backend.repository.FolderRepository;
 import com.passwordmanager.backend.repository.UserRepository;
 
 @Service
@@ -18,17 +19,20 @@ public class DatacenterService {
 
     private final DatacenterRepository datacenterRepository;
     private final DatacenterUserRepository datacenterUserRepository;
+    private final FolderRepository folderRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
 
     public DatacenterService(
             DatacenterRepository datacenterRepository,
             DatacenterUserRepository datacenterUserRepository,
+            FolderRepository folderRepository,
             UserRepository userRepository,
             AuditService auditService
     ) {
         this.datacenterRepository = datacenterRepository;
         this.datacenterUserRepository = datacenterUserRepository;
+        this.folderRepository = folderRepository;
         this.userRepository = userRepository;
         this.auditService = auditService;
     }
@@ -85,6 +89,29 @@ public class DatacenterService {
         auditService.log(user.getId(), user.getUsername(), "CREATE_DATACENTER", "DATACENTER", savedDatacenter.getId(), savedDatacenter.getId(), "Created datacenter: " + savedDatacenter.getName());
 
         return savedDatacenter;
+    }
+
+    @Transactional
+    public void deleteDatacenter(Long datacenterId, String username) {
+        Datacenter datacenter = getDatacenter(datacenterId);
+        User user = getUser(username);
+
+        if (!hasWriteAccess(datacenterId, user.getId())) {
+            throw new SecurityException("Permission denied to delete datacenter.");
+        }
+
+        long folderCount = folderRepository.countByDatacenterId(datacenterId);
+        if (folderCount > 0) {
+            throw new IllegalStateException("Datacenter '" + datacenter.getName() + "' is not empty. It contains " + folderCount + " folders. Delete all folders inside before deleting the datacenter.");
+        }
+
+        // Clean up user access permissions for this datacenter
+        List<DatacenterUser> dcUsers = datacenterUserRepository.findByDatacenterId(datacenterId);
+        datacenterUserRepository.deleteAll(dcUsers);
+
+        datacenterRepository.delete(datacenter);
+
+        auditService.log(user.getId(), user.getUsername(), "DELETE_DATACENTER", "DATACENTER", datacenterId, datacenterId, "Deleted datacenter: " + datacenter.getName());
     }
 
     public List<DatacenterUser> getUsers(Long datacenterId) {

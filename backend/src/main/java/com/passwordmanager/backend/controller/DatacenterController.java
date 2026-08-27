@@ -47,6 +47,12 @@ public class DatacenterController {
         return ResponseEntity.ok(datacenter);
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteDatacenter(@PathVariable Long id, Authentication authentication) {
+        datacenterService.deleteDatacenter(id, authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
+
     // Datacenter user permissions
     @GetMapping("/{id}/users")
     public ResponseEntity<List<DatacenterUser>> getUsers(@PathVariable Long id) {

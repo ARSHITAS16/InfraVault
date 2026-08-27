@@ -3,6 +3,7 @@ package com.passwordmanager.backend.service;
 import com.passwordmanager.backend.entity.Device;
 import com.passwordmanager.backend.entity.Folder;
 import com.passwordmanager.backend.entity.User;
+import com.passwordmanager.backend.repository.CredentialRepository;
 import com.passwordmanager.backend.repository.DeviceRepository;
 import com.passwordmanager.backend.repository.FolderRepository;
 import com.passwordmanager.backend.repository.UserRepository;
@@ -19,6 +20,7 @@ public class DeviceService {
     private final FolderRepository folderRepository;
     private final DatacenterService datacenterService;
     private final CredentialService credentialService;
+    private final CredentialRepository credentialRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
 
@@ -26,12 +28,14 @@ public class DeviceService {
                          FolderRepository folderRepository,
                          DatacenterService datacenterService,
                          CredentialService credentialService,
+                         CredentialRepository credentialRepository,
                          UserRepository userRepository,
                          AuditService auditService) {
         this.deviceRepository = deviceRepository;
         this.folderRepository = folderRepository;
         this.datacenterService = datacenterService;
         this.credentialService = credentialService;
+        this.credentialRepository = credentialRepository;
         this.userRepository = userRepository;
         this.auditService = auditService;
     }
@@ -119,6 +123,9 @@ public class DeviceService {
         if (!datacenterService.hasWriteAccess(datacenterId, user.getId())) {
             throw new SecurityException("Permission denied to delete device in this datacenter");
         }
+
+        // Clean up associated credentials first to prevent foreign key constraint violation
+        credentialRepository.deleteByDeviceId(deviceId);
 
         deviceRepository.delete(device);
 

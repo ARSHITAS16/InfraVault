@@ -166,7 +166,9 @@ export default function App() {
     }
 
     try {
-      if (node.type === 'folder') {
+      if (node.type === 'datacenter') {
+        await datacentersApi.deleteDatacenter(node.numericId);
+      } else if (node.type === 'folder') {
         await foldersApi.deleteFolder(node.numericId, false);
       } else if (node.type === 'device') {
         await devicesApi.deleteDevice(node.numericId);
@@ -180,6 +182,17 @@ export default function App() {
 
   if (!token) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  if (loadingInventory && treeData.length === 0) {
+    return (
+      <div className="infravault-app-layout flex-align justify-content-center text-center" style={{ height: '100vh', backgroundColor: '#0f172a' }}>
+        <div>
+          <div className="spinner mb-3" style={{ width: '32px', height: '32px', margin: '0 auto' }}></div>
+          <h4 style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Loading Infrastructure Vault...</h4>
+        </div>
+      </div>
+    );
   }
 
   let totalDevices = 0;

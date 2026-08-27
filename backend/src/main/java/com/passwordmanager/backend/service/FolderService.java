@@ -1,8 +1,10 @@
 package com.passwordmanager.backend.service;
 
 import com.passwordmanager.backend.entity.Datacenter;
+import com.passwordmanager.backend.entity.Device;
 import com.passwordmanager.backend.entity.Folder;
 import com.passwordmanager.backend.entity.User;
+import com.passwordmanager.backend.repository.CredentialRepository;
 import com.passwordmanager.backend.repository.DatacenterRepository;
 import com.passwordmanager.backend.repository.DeviceRepository;
 import com.passwordmanager.backend.repository.FolderRepository;
@@ -18,6 +20,7 @@ public class FolderService {
     private final FolderRepository folderRepository;
     private final DatacenterRepository datacenterRepository;
     private final DeviceRepository deviceRepository;
+    private final CredentialRepository credentialRepository;
     private final DatacenterService datacenterService;
     private final UserRepository userRepository;
     private final AuditService auditService;
@@ -25,12 +28,14 @@ public class FolderService {
     public FolderService(FolderRepository folderRepository,
                          DatacenterRepository datacenterRepository,
                          DeviceRepository deviceRepository,
+                         CredentialRepository credentialRepository,
                          DatacenterService datacenterService,
                          UserRepository userRepository,
                          AuditService auditService) {
         this.folderRepository = folderRepository;
         this.datacenterRepository = datacenterRepository;
         this.deviceRepository = deviceRepository;
+        this.credentialRepository = credentialRepository;
         this.datacenterService = datacenterService;
         this.userRepository = userRepository;
         this.auditService = auditService;
@@ -88,7 +93,15 @@ public class FolderService {
 
         long deviceCount = deviceRepository.countByFolderId(folderId);
         if (deviceCount > 0 && !force) {
-            throw new IllegalStateException("Folder contains " + deviceCount + " devices. Delete or move all devices before deleting the folder.");
+            throw new IllegalStateException("Folder '" + folder.getName() + "' is not empty. It contains " + deviceCount + " hosts. Delete or move all hosts before deleting the folder.");
+        }
+
+        if (deviceCount > 0 && force) {
+            List<Device> devices = deviceRepository.findByFolderId(folderId);
+            for (Device device : devices) {
+                credentialRepository.deleteByDeviceId(device.getId());
+            }
+            deviceRepository.deleteAll(devices);
         }
 
         folderRepository.delete(folder);
