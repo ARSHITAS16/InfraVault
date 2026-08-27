@@ -31,6 +31,11 @@ public class DatacenterController {
         return ResponseEntity.ok(datacenterService.getDatacentersForUser(authentication.getName()));
     }
 
+    @GetMapping("/tree")
+    public ResponseEntity<List<Map<String, Object>>> getFullTree(Authentication authentication) {
+        return ResponseEntity.ok(datacenterService.getFullTreeForUser(authentication.getName()));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Datacenter> getDatacenter(@PathVariable Long id, Authentication authentication) {
         return ResponseEntity.ok(datacenterService.getDatacenterForUser(id, authentication.getName()));

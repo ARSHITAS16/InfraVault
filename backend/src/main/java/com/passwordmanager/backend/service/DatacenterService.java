@@ -1,16 +1,22 @@
 package com.passwordmanager.backend.service;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.passwordmanager.backend.entity.Datacenter;
 import com.passwordmanager.backend.entity.DatacenterUser;
+import com.passwordmanager.backend.entity.Device;
+import com.passwordmanager.backend.entity.Folder;
 import com.passwordmanager.backend.entity.PermissionLevel;
 import com.passwordmanager.backend.entity.User;
 import com.passwordmanager.backend.repository.DatacenterRepository;
 import com.passwordmanager.backend.repository.DatacenterUserRepository;
+import com.passwordmanager.backend.repository.DeviceRepository;
 import com.passwordmanager.backend.repository.FolderRepository;
 import com.passwordmanager.backend.repository.UserRepository;
 
@@ -20,6 +26,7 @@ public class DatacenterService {
     private final DatacenterRepository datacenterRepository;
     private final DatacenterUserRepository datacenterUserRepository;
     private final FolderRepository folderRepository;
+    private final DeviceRepository deviceRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
 
@@ -27,12 +34,14 @@ public class DatacenterService {
             DatacenterRepository datacenterRepository,
             DatacenterUserRepository datacenterUserRepository,
             FolderRepository folderRepository,
+            DeviceRepository deviceRepository,
             UserRepository userRepository,
             AuditService auditService
     ) {
         this.datacenterRepository = datacenterRepository;
         this.datacenterUserRepository = datacenterUserRepository;
         this.folderRepository = folderRepository;
+        this.deviceRepository = deviceRepository;
         this.userRepository = userRepository;
         this.auditService = auditService;
     }
@@ -49,6 +58,36 @@ public class DatacenterService {
                 .stream()
                 .map(DatacenterUser::getDatacenter)
                 .toList();
+    }
+
+    public List<Map<String, Object>> getFullTreeForUser(String username) {
+        List<Datacenter> dcs = getDatacentersForUser(username);
+
+        List<Map<String, Object>> treeList = new ArrayList<>();
+        for (Datacenter dc : dcs) {
+            Map<String, Object> dcMap = new HashMap<>();
+            dcMap.put("id", dc.getId());
+            dcMap.put("name", dc.getName());
+            dcMap.put("description", dc.getDescription());
+
+            List<Folder> folders = folderRepository.findByDatacenterId(dc.getId());
+            List<Map<String, Object>> folderList = new ArrayList<>();
+
+            for (Folder folder : folders) {
+                Map<String, Object> folderMap = new HashMap<>();
+                folderMap.put("id", folder.getId());
+                folderMap.put("name", folder.getName());
+
+                List<Device> devices = deviceRepository.findByFolderId(folder.getId());
+                folderMap.put("devices", devices);
+                folderList.add(folderMap);
+            }
+
+            dcMap.put("folders", folderList);
+            treeList.add(dcMap);
+        }
+
+        return treeList;
     }
 
     public Datacenter getDatacenter(Long id) {

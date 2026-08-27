@@ -74,6 +74,7 @@ export const authApi = {
 export const datacentersApi = {
   getAll: () => apiRequest<Datacenter[]>('/api/datacenters'),
   getDatacenters: () => apiRequest<Datacenter[]>('/api/datacenters'),
+  getTree: () => apiRequest<any[]>('/api/datacenters/tree'),
 
   create: (data: { name: string; description?: string }) =>
     apiRequest<Datacenter>('/api/datacenters', {
