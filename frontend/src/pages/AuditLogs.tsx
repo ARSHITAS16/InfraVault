@@ -19,8 +19,13 @@ export const AuditLogs: React.FC = () => {
   const formatUTC = (timestampStr: string) => {
     if (!timestampStr) return '-';
     try {
+      let isoStr = timestampStr;
+      if (!isoStr.endsWith('Z') && !isoStr.includes('+')) {
+        isoStr += 'Z';
+      }
+      const date = new Date(isoStr);
       return (
-        new Date(timestampStr).toLocaleString('en-US', {
+        date.toLocaleString('en-US', {
           timeZone: 'UTC',
           year: 'numeric',
           month: 'short',

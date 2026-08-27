@@ -1,7 +1,8 @@
 package com.passwordmanager.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(name = "audit_logs")
@@ -28,8 +29,9 @@ public class AuditLog {
     @Column(name = "datacenter_id")
     private Long datacenterId;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
     @Column(nullable = false)
-    private LocalDateTime timestamp = LocalDateTime.now();
+    private Instant timestamp = Instant.now();
 
     @Column(columnDefinition = "TEXT")
     private String metadata;
@@ -45,7 +47,7 @@ public class AuditLog {
         this.entityId = entityId;
         this.datacenterId = datacenterId;
         this.metadata = metadata;
-        this.timestamp = LocalDateTime.now();
+        this.timestamp = Instant.now();
     }
 
     public Long getId() {
@@ -100,11 +102,11 @@ public class AuditLog {
         this.datacenterId = datacenterId;
     }
 
-    public LocalDateTime getTimestamp() {
+    public Instant getTimestamp() {
         return timestamp;
     }
 
-    public void setTimestamp(LocalDateTime timestamp) {
+    public void setTimestamp(Instant timestamp) {
         this.timestamp = timestamp;
     }
 
