@@ -53,79 +53,71 @@ export default function App() {
     return null;
   };
 
-  // Load cached tree on initial mount for instant load (0ms wait)
-  useEffect(() => {
-    try {
-      const cached = localStorage.getItem('cached_tree_data');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setTreeData(parsed);
-          setSelectedNode(parsed[0]);
-          setLoadingInventory(false);
-        }
-      }
-    } catch (e) {
-      // Ignore cache parse errors
-    }
-  }, []);
-
   const loadFullInventory = useCallback(async () => {
     if (!token) return;
 
     try {
-      // Try single-batch tree API for maximum speed (1 roundtrip instead of N+1 calls)
-      const rawTree = await datacentersApi.getTree();
+      setLoadingInventory(true);
+      const dcs = await datacentersApi.getDatacenters();
+      setDatacenters(dcs);
 
-      const allFetchedDcs: Datacenter[] = [];
       const allFetchedFolders: Folder[] = [];
 
-      const treeNodes: TreeDataNode[] = rawTree.map((dc: any) => {
-        const dcObj: Datacenter = { id: dc.id, name: dc.name, description: dc.description };
-        allFetchedDcs.push(dcObj);
+      const treeNodes: TreeDataNode[] = await Promise.all(
+        dcs.map(async (dc) => {
+          let dcFolders: Folder[] = [];
+          try {
+            dcFolders = await datacentersApi.getFolders(dc.id);
+          } catch {
+            dcFolders = [];
+          }
+          allFetchedFolders.push(...dcFolders);
 
-        const folderNodes: TreeDataNode[] = (dc.folders || []).map((f: any) => {
-          const folderObj: Folder = { id: f.id, name: f.name, datacenter: dcObj };
-          allFetchedFolders.push(folderObj);
+          const folderNodes: TreeDataNode[] = await Promise.all(
+            dcFolders.map(async (f) => {
+              let devices: Device[] = [];
+              try {
+                devices = await foldersApi.getDevices(f.id);
+              } catch {
+                devices = [];
+              }
 
-          const deviceNodes: TreeDataNode[] = (f.devices || []).map((d: any) => ({
-            type: 'device',
-            id: `device-${d.id}`,
-            numericId: d.id,
-            name: d.hostname,
-            datacenterId: dc.id,
-            rawObject: d,
-          }));
+              const deviceNodes: TreeDataNode[] = devices.map((d) => ({
+                type: 'device',
+                id: `device-${d.id}`,
+                numericId: d.id,
+                name: d.hostname,
+                datacenterId: dc.id,
+                rawObject: d,
+              }));
+
+              return {
+                type: 'folder',
+                id: `folder-${f.id}`,
+                numericId: f.id,
+                name: f.name,
+                datacenterId: dc.id,
+                children: deviceNodes,
+                rawObject: f,
+              };
+            })
+          );
 
           return {
-            type: 'folder',
-            id: `folder-${f.id}`,
-            numericId: f.id,
-            name: f.name,
+            type: 'datacenter',
+            id: `dc-${dc.id}`,
+            numericId: dc.id,
+            name: dc.name,
             datacenterId: dc.id,
-            children: deviceNodes,
-            rawObject: folderObj,
+            description: dc.description,
+            children: folderNodes,
+            rawObject: dc,
           };
-        });
+        })
+      );
 
-        return {
-          type: 'datacenter',
-          id: `dc-${dc.id}`,
-          numericId: dc.id,
-          name: dc.name,
-          datacenterId: dc.id,
-          description: dc.description,
-          children: folderNodes,
-          rawObject: dcObj,
-        };
-      });
-
-      setDatacenters(allFetchedDcs);
       setFolders(allFetchedFolders);
       setTreeData(treeNodes);
-
-      // Save to localStorage cache for instant zero-wait page reloads
-      localStorage.setItem('cached_tree_data', JSON.stringify(treeNodes));
 
       if (treeNodes.length > 0) {
         setSelectedNode((prev) => {
@@ -135,7 +127,7 @@ export default function App() {
         });
       }
     } catch (err: any) {
-      console.warn('Single-batch tree fetch failed:', err);
+      console.error('Failed to load inventory:', err);
     } finally {
       setLoadingInventory(false);
     }
