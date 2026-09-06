@@ -15,7 +15,7 @@ public interface CredentialRepository extends JpaRepository<Credential, Long> {
     List<Credential> findByDeviceId(Long deviceId);
     Optional<Credential> findByDeviceIdAndType(Long deviceId, String type);
 
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("DELETE FROM Credential c WHERE c.device.id = :deviceId")
     void deleteByDeviceId(@Param("deviceId") Long deviceId);
 }

@@ -77,12 +77,14 @@ public class CredentialService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        if (!datacenterService.hasAccess(datacenterId, user.getId())) {
-            throw new SecurityException("Permission denied for this datacenter");
-        }
-
         Credential credential = credentialRepository.findById(credentialId)
                 .orElseThrow(() -> new IllegalArgumentException("Credential not found"));
+
+        Long actualDcId = datacenterId != null ? datacenterId : credential.getDevice().getFolder().getDatacenter().getId();
+
+        if (!datacenterService.hasAccess(actualDcId, user.getId())) {
+            throw new SecurityException("Permission denied for this datacenter");
+        }
 
         String decrypted = encryptionService.decrypt(credential.getEncryptedSecret());
 
@@ -93,7 +95,7 @@ public class CredentialService {
                 "REVEAL",
                 "CREDENTIAL",
                 credential.getId(),
-                datacenterId,
+                actualDcId,
                 "Revealed credential type: " + credential.getType() + " for device ID: " + credential.getDevice().getId()
         );
 
@@ -105,12 +107,14 @@ public class CredentialService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        if (!datacenterService.hasWriteAccess(datacenterId, user.getId())) {
-            throw new SecurityException("Permission denied to update credentials in this datacenter");
-        }
-
         Credential credential = credentialRepository.findById(credentialId)
                 .orElseThrow(() -> new IllegalArgumentException("Credential not found"));
+
+        Long actualDcId = datacenterId != null ? datacenterId : credential.getDevice().getFolder().getDatacenter().getId();
+
+        if (!datacenterService.hasWriteAccess(actualDcId, user.getId())) {
+            throw new SecurityException("Permission denied to update credentials in this datacenter");
+        }
 
         String encrypted = encryptionService.encrypt(newPassword);
         credential.setEncryptedSecret(encrypted);
@@ -122,7 +126,7 @@ public class CredentialService {
                 "UPDATE_CREDENTIAL",
                 "CREDENTIAL",
                 credential.getId(),
-                datacenterId,
+                actualDcId,
                 "Updated encrypted password for credential type: " + credential.getType() + " on device: " + credential.getDevice().getHostname()
         );
     }

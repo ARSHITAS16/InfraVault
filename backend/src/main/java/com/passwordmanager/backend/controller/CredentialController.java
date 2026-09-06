@@ -24,18 +24,29 @@ public class CredentialController {
 
     @PostMapping("/{id}/reveal")
     public ResponseEntity<Map<String, String>> revealCredential(@PathVariable Long id,
-                                                                @RequestParam Long datacenterId,
+                                                                @RequestParam(required = false) Long datacenterId,
                                                                 Authentication authentication) {
         String decryptedSecret = credentialService.revealSecret(id, datacenterId, authentication.getName());
         return ResponseEntity.ok(Map.of("secret", decryptedSecret));
     }
 
     @PostMapping("/{id}/update")
-    public ResponseEntity<Map<String, String>> updateCredential(@PathVariable Long id,
-                                                                @RequestBody Map<String, Object> payload,
-                                                                Authentication authentication) {
-        Long datacenterId = Long.valueOf(payload.get("datacenterId").toString());
-        String newPassword = payload.get("newPassword").toString();
+    public ResponseEntity<Map<String, String>> updateCredentialPost(@PathVariable Long id,
+                                                                    @RequestBody Map<String, Object> payload,
+                                                                    Authentication authentication) {
+        return handleUpdate(id, payload, authentication);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Map<String, String>> updateCredentialPut(@PathVariable Long id,
+                                                                   @RequestBody Map<String, Object> payload,
+                                                                   Authentication authentication) {
+        return handleUpdate(id, payload, authentication);
+    }
+
+    private ResponseEntity<Map<String, String>> handleUpdate(Long id, Map<String, Object> payload, Authentication authentication) {
+        Long datacenterId = payload.get("datacenterId") != null ? Long.valueOf(payload.get("datacenterId").toString()) : null;
+        String newPassword = payload.get("newPassword") != null ? payload.get("newPassword").toString() : payload.get("password") != null ? payload.get("password").toString() : "";
 
         credentialService.updateCredential(id, datacenterId, newPassword, authentication.getName());
         return ResponseEntity.ok(Map.of("message", "Password updated successfully"));

@@ -1,4 +1,3 @@
-
 package com.passwordmanager.backend.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -20,11 +19,11 @@ public class DatacenterUser {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "datacenter_id", nullable = false)
     private Datacenter datacenter;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
@@ -58,6 +57,9 @@ public class DatacenterUser {
     }
 
     public User getUser() {
+        if (user != null) {
+            user.setPasswordHash(null);
+        }
         return user;
     }
 
