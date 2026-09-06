@@ -1,6 +1,5 @@
 package com.passwordmanager.backend.service;
 
-import com.passwordmanager.backend.entity.Credential;
 import com.passwordmanager.backend.entity.Device;
 import com.passwordmanager.backend.entity.Folder;
 import com.passwordmanager.backend.entity.User;
@@ -8,6 +7,8 @@ import com.passwordmanager.backend.repository.CredentialRepository;
 import com.passwordmanager.backend.repository.DeviceRepository;
 import com.passwordmanager.backend.repository.FolderRepository;
 import com.passwordmanager.backend.repository.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +25,9 @@ public class DeviceService {
     private final CredentialRepository credentialRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public DeviceService(DeviceRepository deviceRepository,
                          FolderRepository folderRepository,
@@ -125,15 +129,14 @@ public class DeviceService {
             throw new SecurityException("Permission denied to delete device in this datacenter");
         }
 
-        // Clean up associated credentials first to prevent foreign key constraint violation
-        List<Credential> credentials = credentialRepository.findByDeviceId(deviceId);
-        if (credentials != null && !credentials.isEmpty()) {
-            credentialRepository.deleteAll(credentials);
-            credentialRepository.flush();
-        }
+        // Native SQL delete guarantees credentials are deleted FIRST in PostgreSQL before device
+        entityManager.createNativeQuery("DELETE FROM credentials WHERE device_id = :deviceId")
+                .setParameter("deviceId", deviceId)
+                .executeUpdate();
 
-        deviceRepository.delete(device);
-        deviceRepository.flush();
+        entityManager.createNativeQuery("DELETE FROM devices WHERE id = :deviceId")
+                .setParameter("deviceId", deviceId)
+                .executeUpdate();
 
         auditService.log(user.getId(), user.getUsername(), "DELETE_DEVICE", "DEVICE", deviceId, datacenterId, "Deleted device: " + device.getHostname());
     }

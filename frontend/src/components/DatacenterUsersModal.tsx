@@ -23,6 +23,8 @@ export const DatacenterUsersModal: React.FC<DatacenterUsersModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const getAssignedUserId = (du: any) => du.user?.id || du.userId || du.id;
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -46,7 +48,7 @@ export const DatacenterUsersModal: React.FC<DatacenterUsersModalProps> = ({
       setAllUsers(users);
 
       const unassigned = users.filter(
-        (u) => !assigned.some((du) => du.user?.id === u.id)
+        (u) => !assigned.some((du: any) => getAssignedUserId(du) === u.id)
       );
       if (unassigned.length > 0) {
         setSelectedUserId(unassigned[0].id);
@@ -74,7 +76,7 @@ export const DatacenterUsersModal: React.FC<DatacenterUsersModalProps> = ({
         Number(selectedUserId),
         permissionLevel
       );
-      loadData();
+      await loadData();
     } catch (err: any) {
       setError(err.message || 'Failed to assign user');
     }
@@ -86,14 +88,14 @@ export const DatacenterUsersModal: React.FC<DatacenterUsersModalProps> = ({
     try {
       setError('');
       await datacentersApi.removeUser(datacenter.id, userId);
-      loadData();
+      await loadData();
     } catch (err: any) {
       setError(err.message || 'Failed to remove user permission');
     }
   };
 
   const unassignedUsers = allUsers.filter(
-    (u) => !dcUsers.some((du) => du.user?.id === u.id)
+    (u) => !dcUsers.some((du: any) => getAssignedUserId(du) === u.id)
   );
 
   return (
@@ -203,40 +205,46 @@ export const DatacenterUsersModal: React.FC<DatacenterUsersModalProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  dcUsers.map((du) => (
-                    <tr key={du.id || du.user?.id}>
-                      <td><strong>{du.user?.username || 'User'}</strong></td>
-                      <td>{du.user?.email || '-'}</td>
-                      <td>
-                        <span className="badge badge-secondary">
-                          {du.user?.role || 'OPERATOR'}
-                        </span>
-                      </td>
-                      <td>
-                        <span
-                          className={`badge ${
-                            du.permissionLevel === 'ADMIN'
-                              ? 'badge-warning'
-                              : du.permissionLevel === 'WRITE'
-                              ? 'badge-primary'
-                              : 'badge-info'
-                          }`}
-                        >
-                          {du.permissionLevel}
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn btn-danger btn-sm p-1"
-                          onClick={() => du.user && handleRemoveUser(du.user.id)}
-                          title="Revoke Datacenter Access"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  dcUsers.map((du: any) => {
+                    const userObj = du.user || du;
+                    const userId = userObj.id || du.userId;
+                    const username = userObj.username || 'User';
+                    const email = userObj.email || '-';
+                    const role = userObj.role || 'OPERATOR';
+
+                    return (
+                      <tr key={du.id || userId}>
+                        <td><strong>{username}</strong></td>
+                        <td>{email}</td>
+                        <td>
+                          <span className="badge badge-secondary">{role}</span>
+                        </td>
+                        <td>
+                          <span
+                            className={`badge ${
+                              du.permissionLevel === 'ADMIN'
+                                ? 'badge-warning'
+                                : du.permissionLevel === 'WRITE'
+                                ? 'badge-primary'
+                                : 'badge-info'
+                            }`}
+                          >
+                            {du.permissionLevel}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-sm p-1"
+                            onClick={() => handleRemoveUser(userId)}
+                            title="Revoke Datacenter Access"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
