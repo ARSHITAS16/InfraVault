@@ -1,4 +1,5 @@
-# InfraVault - Password & Infrastructure Inventory System
+# InfraVault - Enterprise Infrastructure Password & Credential Manager
+Build Trigger: 2026-09-06T21:28:40+05:30m
 
 **InfraVault** is a secure enterprise password management and hardware infrastructure inventory system designed with split-pane navigation, AES-256-GCM secret encryption, datacenter permission delegation, Excel bulk migration, and operational security audit logs.
 
