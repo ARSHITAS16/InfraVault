@@ -19,6 +19,7 @@ public class DatacenterUser {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "datacenter_id", nullable = false)
     private Datacenter datacenter;
