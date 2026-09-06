@@ -1,5 +1,6 @@
 package com.passwordmanager.backend.service;
 
+import com.passwordmanager.backend.entity.Credential;
 import com.passwordmanager.backend.entity.Device;
 import com.passwordmanager.backend.entity.Folder;
 import com.passwordmanager.backend.entity.User;
@@ -125,9 +126,14 @@ public class DeviceService {
         }
 
         // Clean up associated credentials first to prevent foreign key constraint violation
-        credentialRepository.deleteByDeviceId(deviceId);
+        List<Credential> credentials = credentialRepository.findByDeviceId(deviceId);
+        if (credentials != null && !credentials.isEmpty()) {
+            credentialRepository.deleteAll(credentials);
+            credentialRepository.flush();
+        }
 
         deviceRepository.delete(device);
+        deviceRepository.flush();
 
         auditService.log(user.getId(), user.getUsername(), "DELETE_DEVICE", "DEVICE", deviceId, datacenterId, "Deleted device: " + device.getHostname());
     }

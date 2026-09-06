@@ -1,7 +1,6 @@
 package com.passwordmanager.backend.service;
 
 import com.passwordmanager.backend.entity.Datacenter;
-import com.passwordmanager.backend.entity.Device;
 import com.passwordmanager.backend.entity.Folder;
 import com.passwordmanager.backend.entity.User;
 import com.passwordmanager.backend.repository.CredentialRepository;
@@ -92,16 +91,8 @@ public class FolderService {
         }
 
         long deviceCount = deviceRepository.countByFolderId(folderId);
-        if (deviceCount > 0 && !force) {
-            throw new IllegalStateException("Folder '" + folder.getName() + "' is not empty. It contains " + deviceCount + " hosts. Delete or move all hosts before deleting the folder.");
-        }
-
-        if (deviceCount > 0 && force) {
-            List<Device> devices = deviceRepository.findByFolderId(folderId);
-            for (Device device : devices) {
-                credentialRepository.deleteByDeviceId(device.getId());
-            }
-            deviceRepository.deleteAll(devices);
+        if (deviceCount > 0) {
+            throw new IllegalStateException("Folder '" + folder.getName() + "' is not empty. It contains " + deviceCount + " host(s). Please delete all child hosts before deleting this folder.");
         }
 
         folderRepository.delete(folder);

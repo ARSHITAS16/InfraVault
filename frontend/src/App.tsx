@@ -161,6 +161,16 @@ export default function App() {
   };
 
   const handleDeleteNode = async (node: TreeDataNode) => {
+    if (node.type === 'datacenter' && node.children && node.children.length > 0) {
+      alert(`Cannot delete Datacenter "${node.name}" because it contains ${node.children.length} folder(s). Please delete all child folders first.`);
+      return;
+    }
+
+    if (node.type === 'folder' && node.children && node.children.length > 0) {
+      alert(`Cannot delete Folder "${node.name}" because it contains ${node.children.length} host(s). Please delete all child hosts first.`);
+      return;
+    }
+
     if (!window.confirm(`Are you sure you want to delete ${node.type} "${node.name}"?`)) {
       return;
     }

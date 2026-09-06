@@ -99,4 +99,31 @@ public class CredentialService {
 
         return decrypted;
     }
+
+    @Transactional
+    public void updateCredential(Long credentialId, Long datacenterId, String newPassword, String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (!datacenterService.hasWriteAccess(datacenterId, user.getId())) {
+            throw new SecurityException("Permission denied to update credentials in this datacenter");
+        }
+
+        Credential credential = credentialRepository.findById(credentialId)
+                .orElseThrow(() -> new IllegalArgumentException("Credential not found"));
+
+        String encrypted = encryptionService.encrypt(newPassword);
+        credential.setEncryptedSecret(encrypted);
+        credentialRepository.save(credential);
+
+        auditService.log(
+                user.getId(),
+                user.getUsername(),
+                "UPDATE_CREDENTIAL",
+                "CREDENTIAL",
+                credential.getId(),
+                datacenterId,
+                "Updated encrypted password for credential type: " + credential.getType() + " on device: " + credential.getDevice().getHostname()
+        );
+    }
 }

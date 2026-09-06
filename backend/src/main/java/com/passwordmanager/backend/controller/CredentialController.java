@@ -30,6 +30,17 @@ public class CredentialController {
         return ResponseEntity.ok(Map.of("secret", decryptedSecret));
     }
 
+    @PostMapping("/{id}/update")
+    public ResponseEntity<Map<String, String>> updateCredential(@PathVariable Long id,
+                                                                @RequestBody Map<String, Object> payload,
+                                                                Authentication authentication) {
+        Long datacenterId = Long.valueOf(payload.get("datacenterId").toString());
+        String newPassword = payload.get("newPassword").toString();
+
+        credentialService.updateCredential(id, datacenterId, newPassword, authentication.getName());
+        return ResponseEntity.ok(Map.of("message", "Password updated successfully"));
+    }
+
     @PostMapping("/create")
     public ResponseEntity<Map<String, Object>> createCredential(@RequestBody Map<String, Object> payload,
                                                                 Authentication authentication) {

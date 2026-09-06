@@ -814,3 +814,13 @@ body {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* Calendar Icon High-Visibility Style for Date Fields */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(2);
+  cursor: pointer;
+  opacity: 0.9;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}

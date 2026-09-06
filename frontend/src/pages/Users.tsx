@@ -1,19 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { Users as UsersIcon, Shield, Search } from 'lucide-react';
+import { Users as UsersIcon, Shield, Search, UserPlus } from 'lucide-react';
 import { User } from '../types';
 import { usersApi } from '../services/api';
+import { CreateUserModal } from '../components/CreateUserModal';
 
 export const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
 
-  useEffect(() => {
+  const fetchUsers = () => {
+    setLoading(true);
     usersApi
       .getAllUsers()
       .then((data) => setUsers(data))
       .catch(() => setUsers([]))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchUsers();
   }, []);
 
   const filteredUsers = users.filter(
@@ -33,15 +40,26 @@ export const UsersPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="navbar-search" style={{ maxWidth: '300px' }}>
-          <Search className="search-icon" size={16} />
-          <input
-            type="text"
-            placeholder="Search users..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="search-input"
-          />
+        <div className="flex-align gap-2">
+          <div className="navbar-search" style={{ maxWidth: '280px' }}>
+            <Search className="search-icon" size={16} />
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="search-input"
+            />
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setShowAddUserModal(true)}
+            style={{ whiteSpace: 'nowrap' }}
+          >
+            <UserPlus size={16} /> <span>+ Add User</span>
+          </button>
         </div>
       </div>
 
@@ -69,7 +87,7 @@ export const UsersPage: React.FC = () => {
                 ) : filteredUsers.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="text-center text-muted py-4">
-                      No users found.
+                      No users found. Click "+ Add User" to create one.
                     </td>
                   </tr>
                 ) : (
@@ -107,6 +125,13 @@ export const UsersPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {showAddUserModal && (
+        <CreateUserModal
+          onClose={() => setShowAddUserModal(false)}
+          onCreated={fetchUsers}
+        />
+      )}
     </div>
   );
 };

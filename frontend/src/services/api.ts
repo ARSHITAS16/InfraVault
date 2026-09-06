@@ -207,13 +207,19 @@ export const devicesApi = {
     }),
 };
 
-// Credential Reveal & Create API
+// Credential Reveal, Edit & Create API
 export const credentialsApi = {
   reveal: (credentialId: number, datacenterId: number) =>
     apiRequest<{ id: number; type: string; secret: string }>(
       `/api/credentials/${credentialId}/reveal?datacenterId=${datacenterId}`,
       { method: 'POST' }
     ),
+
+  update: (credentialId: number, newPassword: string, datacenterId: number) =>
+    apiRequest<{ message: string }>(`/api/credentials/${credentialId}/update`, {
+      method: 'POST',
+      body: JSON.stringify({ newPassword, datacenterId }),
+    }),
 
   create: (deviceId: number, type: string, username: string, password?: string) =>
     apiRequest<{ message: string }>('/api/credentials/create', {
@@ -232,6 +238,8 @@ export const auditApi = {
 export const usersApi = {
   getAll: () => apiRequest<User[]>('/api/users'),
   getAllUsers: () => apiRequest<User[]>('/api/users'),
+  createUser: (username: string, email: string, password: string, role?: string) =>
+    authApi.register(username, email, password, role),
 };
 
 // Excel Import API
