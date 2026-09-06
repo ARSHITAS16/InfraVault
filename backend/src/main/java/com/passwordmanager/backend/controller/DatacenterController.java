@@ -55,9 +55,34 @@ public class DatacenterController {
 
     // Datacenter user permissions
     @GetMapping("/{id}/users")
-    public ResponseEntity<List<Map<String, Object>>> getUsers(@PathVariable Long id) {
-        List<DatacenterUser> users = datacenterService.getUsers(id);
-        List<Map<String, Object>> result = users.stream().map(du -> {
+    public ResponseEntity<?> getUsers(@PathVariable Long id) {
+        try {
+            List<DatacenterUser> users = datacenterService.getUsers(id);
+            List<Map<String, Object>> result = users.stream().map(du -> {
+                Map<String, Object> map = new java.util.HashMap<>();
+                map.put("id", du.getId());
+                map.put("permissionLevel", du.getPermissionLevel() != null ? du.getPermissionLevel().name() : null);
+                if (du.getUser() != null) {
+                    Map<String, Object> userMap = new java.util.HashMap<>();
+                    userMap.put("id", du.getUser().getId());
+                    userMap.put("username", du.getUser().getUsername());
+                    userMap.put("email", du.getUser().getEmail());
+                    userMap.put("role", du.getUser().getRole());
+                    map.put("user", userMap);
+                }
+                return map;
+            }).collect(java.util.stream.Collectors.toList());
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
+    }
+
+    @PostMapping("/{id}/users")
+    public ResponseEntity<?> addUser(@PathVariable Long id, @RequestBody AddUserRequest request) {
+        try {
+            PermissionLevel level = PermissionLevel.valueOf(request.getPermissionLevel().toUpperCase());
+            DatacenterUser du = datacenterService.addUser(id, request.getUserId(), level);
             Map<String, Object> map = new java.util.HashMap<>();
             map.put("id", du.getId());
             map.put("permissionLevel", du.getPermissionLevel() != null ? du.getPermissionLevel().name() : null);
@@ -69,27 +94,10 @@ public class DatacenterController {
                 userMap.put("role", du.getUser().getRole());
                 map.put("user", userMap);
             }
-            return map;
-        }).collect(java.util.stream.Collectors.toList());
-        return ResponseEntity.ok(result);
-    }
-
-    @PostMapping("/{id}/users")
-    public ResponseEntity<Map<String, Object>> addUser(@PathVariable Long id, @RequestBody AddUserRequest request) {
-        PermissionLevel level = PermissionLevel.valueOf(request.getPermissionLevel().toUpperCase());
-        DatacenterUser du = datacenterService.addUser(id, request.getUserId(), level);
-        Map<String, Object> map = new java.util.HashMap<>();
-        map.put("id", du.getId());
-        map.put("permissionLevel", du.getPermissionLevel() != null ? du.getPermissionLevel().name() : null);
-        if (du.getUser() != null) {
-            Map<String, Object> userMap = new java.util.HashMap<>();
-            userMap.put("id", du.getUser().getId());
-            userMap.put("username", du.getUser().getUsername());
-            userMap.put("email", du.getUser().getEmail());
-            userMap.put("role", du.getUser().getRole());
-            map.put("user", userMap);
+            return ResponseEntity.ok(map);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage() != null ? e.getMessage() : "Failed to add user"));
         }
-        return ResponseEntity.ok(map);
     }
 
     @DeleteMapping("/{id}/users/{userId}")

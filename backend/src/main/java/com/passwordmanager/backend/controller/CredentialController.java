@@ -45,11 +45,19 @@ public class CredentialController {
     }
 
     private ResponseEntity<Map<String, String>> handleUpdate(Long id, Map<String, Object> payload, Authentication authentication) {
-        Long datacenterId = payload.get("datacenterId") != null ? Long.valueOf(payload.get("datacenterId").toString()) : null;
-        String newPassword = payload.get("newPassword") != null ? payload.get("newPassword").toString() : payload.get("password") != null ? payload.get("password").toString() : "";
+        try {
+            Long datacenterId = payload.get("datacenterId") != null ? Long.valueOf(payload.get("datacenterId").toString()) : null;
+            String newPassword = payload.get("newPassword") != null ? payload.get("newPassword").toString() : payload.get("password") != null ? payload.get("password").toString() : "";
 
-        credentialService.updateCredential(id, datacenterId, newPassword, authentication.getName());
-        return ResponseEntity.ok(Map.of("message", "Password updated successfully"));
+            credentialService.updateCredential(id, datacenterId, newPassword, authentication.getName());
+            return ResponseEntity.ok(Map.of("message", "Password updated successfully"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", e.getMessage() != null ? e.getMessage() : "Error updating credential"));
+        }
     }
 
     @PostMapping("/create")
