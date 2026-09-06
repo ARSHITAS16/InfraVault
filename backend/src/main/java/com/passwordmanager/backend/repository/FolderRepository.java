@@ -20,4 +20,6 @@ public interface FolderRepository
             String name,
             Long datacenterId
     );
+
+    long countByDatacenterId(Long datacenterId);
 }
