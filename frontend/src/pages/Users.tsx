@@ -1,27 +1,70 @@
 import React, { useEffect, useState } from 'react';
-import { Users as UsersIcon, Shield, Search, UserPlus } from 'lucide-react';
+import { Search, UserPlus, ShieldAlert, Trash2 } from 'lucide-react';
 import { User } from '../types';
 import { usersApi } from '../services/api';
 import { CreateUserModal } from '../components/CreateUserModal';
 
-export const UsersPage: React.FC = () => {
+interface UsersPageProps {
+  currentUserRole?: string;
+}
+
+export const UsersPage: React.FC<UsersPageProps> = ({ currentUserRole = 'OPERATOR' }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [showAddUserModal, setShowAddUserModal] = useState(false);
 
+  const isSuperAdmin = currentUserRole === 'SUPER_ADMIN';
+  const currentUsername = localStorage.getItem('username') || '';
+
   const fetchUsers = () => {
     setLoading(true);
+    setError('');
     usersApi
       .getAllUsers()
       .then((data) => setUsers(data))
-      .catch(() => setUsers([]))
+      .catch((err: any) => {
+        setUsers([]);
+        setError(err.message || 'Failed to load users');
+      })
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  const handleRoleChange = async (userId: number, newRole: string) => {
+    try {
+      setError('');
+      await usersApi.updateUser(userId, { role: newRole });
+      fetchUsers();
+    } catch (err: any) {
+      setError(err.message || 'Failed to update user role');
+    }
+  };
+
+  const handleToggleActive = async (u: User) => {
+    try {
+      setError('');
+      await usersApi.updateUser(u.id, { active: !u.active });
+      fetchUsers();
+    } catch (err: any) {
+      setError(err.message || 'Failed to update user status');
+    }
+  };
+
+  const handleDeleteUser = async (u: User) => {
+    if (!window.confirm(`Delete user "${u.username}"? This cannot be undone.`)) return;
+    try {
+      setError('');
+      await usersApi.deleteUser(u.id);
+      fetchUsers();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete user');
+    }
+  };
 
   const filteredUsers = users.filter(
     (u) =>
@@ -52,16 +95,25 @@ export const UsersPage: React.FC = () => {
             />
           </div>
 
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => setShowAddUserModal(true)}
-            style={{ whiteSpace: 'nowrap' }}
-          >
-            <UserPlus size={16} /> <span>+ Add User</span>
-          </button>
+          {isSuperAdmin && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setShowAddUserModal(true)}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              <UserPlus size={16} /> <span>+ Add User</span>
+            </button>
+          )}
         </div>
       </div>
+
+      {error && (
+        <div className="alert alert-danger mb-3">
+          <ShieldAlert size={16} />
+          <span>{error}</span>
+        </div>
+      )}
 
       <div className="card">
         <div className="card-body p-0">
@@ -75,50 +127,92 @@ export const UsersPage: React.FC = () => {
                   <th>Global Role</th>
                   <th>Status</th>
                   <th>Created At</th>
+                  {isSuperAdmin && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-4">
+                    <td colSpan={isSuperAdmin ? 7 : 6} className="text-center py-4">
                       <span className="spinner"></span> Loading users...
                     </td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center text-muted py-4">
-                      No users found. Click "+ Add User" to create one.
+                    <td colSpan={isSuperAdmin ? 7 : 6} className="text-center text-muted py-4">
+                      {error ? 'Unable to view system users.' : 'No users found.'}
                     </td>
                   </tr>
                 ) : (
-                  filteredUsers.map((u) => (
-                    <tr key={u.id}>
-                      <td>#{u.id}</td>
-                      <td><strong>{u.username}</strong></td>
-                      <td>{u.email}</td>
-                      <td>
-                        <span
-                          className={`badge ${
-                            u.role === 'SUPER_ADMIN'
-                              ? 'badge-danger'
-                              : u.role === 'DC_ADMIN'
-                              ? 'badge-warning'
-                              : u.role === 'OPERATOR'
-                              ? 'badge-primary'
-                              : 'badge-secondary'
-                          }`}
-                        >
-                          {u.role || 'OPERATOR'}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`badge ${u.active ? 'badge-success' : 'badge-danger'}`}>
-                          {u.active ? 'Active' : 'Disabled'}
-                        </span>
-                      </td>
-                      <td>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-'}</td>
-                    </tr>
-                  ))
+                  filteredUsers.map((u) => {
+                    const isSelf = u.username === currentUsername;
+                    return (
+                      <tr key={u.id}>
+                        <td>#{u.id}</td>
+                        <td><strong>{u.username}</strong></td>
+                        <td>{u.email}</td>
+                        <td>
+                          {isSuperAdmin && !isSelf ? (
+                            <select
+                              className="form-control form-control-sm"
+                              value={u.role || 'OPERATOR'}
+                              onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                              style={{ minWidth: '140px' }}
+                            >
+                              <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                              <option value="DC_ADMIN">DC_ADMIN</option>
+                              <option value="OPERATOR">OPERATOR</option>
+                              <option value="VIEWER">VIEWER</option>
+                            </select>
+                          ) : (
+                            <span
+                              className={`badge ${
+                                u.role === 'SUPER_ADMIN'
+                                  ? 'badge-danger'
+                                  : u.role === 'DC_ADMIN'
+                                  ? 'badge-warning'
+                                  : u.role === 'OPERATOR'
+                                  ? 'badge-primary'
+                                  : 'badge-secondary'
+                              }`}
+                            >
+                              {u.role || 'OPERATOR'}
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <span className={`badge ${u.active ? 'badge-success' : 'badge-danger'}`}>
+                            {u.active ? 'Active' : 'Disabled'}
+                          </span>
+                        </td>
+                        <td>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-'}</td>
+                        {isSuperAdmin && (
+                          <td>
+                            <div className="flex-align gap-2">
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                disabled={isSelf}
+                                onClick={() => handleToggleActive(u)}
+                                title={isSelf ? 'Cannot disable your own account' : (u.active ? 'Disable User' : 'Enable User')}
+                              >
+                                {u.active ? 'Disable' : 'Enable'}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-danger btn-sm p-1"
+                                disabled={isSelf}
+                                onClick={() => handleDeleteUser(u)}
+                                title={isSelf ? 'Cannot delete your own account' : 'Delete User'}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

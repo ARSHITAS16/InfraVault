@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Database, Folder, Server, ShieldCheck, AlertTriangle, FileText } from 'lucide-react';
+import { Database, Folder, Server, ShieldCheck, FileText } from 'lucide-react';
 import { Datacenter, AuditLog } from '../types';
 import { auditApi } from '../services/api';
 
@@ -7,6 +7,7 @@ interface DashboardProps {
   datacenters: Datacenter[];
   totalFolders: number;
   totalDevices: number;
+  isAdmin?: boolean;
   onNavigateToDatacenter: (dcId: number) => void;
 }
 
@@ -14,16 +15,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
   datacenters,
   totalFolders,
   totalDevices,
+  isAdmin = false,
   onNavigateToDatacenter,
 }) => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
 
   useEffect(() => {
+    if (!isAdmin) {
+      setLogs([]);
+      return;
+    }
     auditApi
       .getAuditLogs()
       .then((data) => setLogs(data.slice(0, 10)))
       .catch(() => setLogs([]));
-  }, []);
+  }, [isAdmin]);
 
   return (
     <div className="dashboard-container">
@@ -80,83 +86,89 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Datacenters Grid */}
       <div className="section-title text-primary mb-3">Accessible Datacenters</div>
       <div className="grid-3 mb-4">
-        {datacenters.map((dc) => (
-          <div
-            key={dc.id}
-            className="dc-summary-card"
-            onClick={() => onNavigateToDatacenter(dc.id)}
-          >
-            <div className="dc-card-header">
-              <Database size={20} className="text-primary" />
-              <span className="dc-name">{dc.name}</span>
+        {datacenters.length === 0 ? (
+          <div className="alert alert-info">No accessible datacenters found for your account.</div>
+        ) : (
+          datacenters.map((dc) => (
+            <div
+              key={dc.id}
+              className="dc-summary-card"
+              onClick={() => onNavigateToDatacenter(dc.id)}
+            >
+              <div className="dc-card-header">
+                <Database size={20} className="text-primary" />
+                <span className="dc-name">{dc.name}</span>
+              </div>
+              <p className="dc-desc">{dc.description || 'Datacenter'}</p>
+              <div className="dc-card-footer">
+                <span className="btn-link">View Inventory &rarr;</span>
+              </div>
             </div>
-            <p className="dc-desc">{dc.description || 'Datacenter'}</p>
-            <div className="dc-card-footer">
-              <span className="btn-link">View Inventory &rarr;</span>
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       {/* Recent Audit Logs */}
-      <div className="card mt-4">
-        <div className="card-header flex-between">
-          <div className="flex-align">
-            <FileText size={18} className="mr-2" />
-            <span className="font-weight-bold">Recent Security & Operations Audit Logs</span>
+      {isAdmin && (
+        <div className="card mt-4">
+          <div className="card-header flex-between">
+            <div className="flex-align">
+              <FileText size={18} className="mr-2" />
+              <span className="font-weight-bold">Recent Security & Operations Audit Logs</span>
+            </div>
           </div>
-        </div>
-        <div className="card-body p-0">
-          <div className="table-responsive">
-            <table className="infravault-table">
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>User</th>
-                  <th>Action</th>
-                  <th>Entity Type</th>
-                  <th>Entity ID</th>
-                  <th>Metadata</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.length === 0 ? (
+          <div className="card-body p-0">
+            <div className="table-responsive">
+              <table className="infravault-table">
+                <thead>
                   <tr>
-                    <td colSpan={6} className="text-center text-muted py-3">
-                      No audit activity recorded yet.
-                    </td>
+                    <th>Timestamp (UTC)</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Entity Type</th>
+                    <th>Entity ID</th>
+                    <th>Metadata</th>
                   </tr>
-                ) : (
-                  logs.map((log) => (
-                    <tr key={log.id}>
-                      <td>{new Date(log.timestamp).toLocaleString()}</td>
-                      <td><strong>{log.username}</strong></td>
-                      <td>
-                        <span
-                          className={`badge ${
-                            log.action === 'REVEAL'
-                              ? 'badge-warning'
-                              : log.action.startsWith('CREATE')
-                              ? 'badge-success'
-                              : log.action.startsWith('DELETE')
-                              ? 'badge-danger'
-                              : 'badge-info'
-                          }`}
-                        >
-                          {log.action}
-                        </span>
+                </thead>
+                <tbody>
+                  {logs.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center text-muted py-3">
+                        No audit activity recorded yet.
                       </td>
-                      <td>{log.entityType}</td>
-                      <td>{log.entityId || '-'}</td>
-                      <td className="text-muted">{log.metadata || '-'}</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    logs.map((log) => (
+                      <tr key={log.id}>
+                        <td>{new Date(log.timestamp).toISOString().replace('T', ' ').slice(0, 19)} UTC</td>
+                        <td><strong>{log.username}</strong></td>
+                        <td>
+                          <span
+                            className={`badge ${
+                              log.action === 'REVEAL'
+                                ? 'badge-warning'
+                                : log.action.startsWith('CREATE')
+                                ? 'badge-success'
+                                : log.action.startsWith('DELETE')
+                                ? 'badge-danger'
+                                : 'badge-info'
+                            }`}
+                          >
+                            {log.action}
+                          </span>
+                        </td>
+                        <td>{log.entityType}</td>
+                        <td>{log.entityId || '-'}</td>
+                        <td className="text-muted">{log.metadata || '-'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

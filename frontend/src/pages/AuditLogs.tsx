@@ -1,18 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { FileText, Search, ShieldCheck } from 'lucide-react';
+import { Search, ShieldAlert } from 'lucide-react';
 import { AuditLog } from '../types';
 import { auditApi } from '../services/api';
 
 export const AuditLogs: React.FC = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
 
   useEffect(() => {
     auditApi
       .getAuditLogs()
-      .then((data) => setLogs(data))
-      .catch(() => setLogs([]))
+      .then((data) => {
+        setLogs(data);
+        setError('');
+      })
+      .catch((err: any) => {
+        setLogs([]);
+        setError(err.message || 'Failed to load audit logs');
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -43,9 +50,9 @@ export const AuditLogs: React.FC = () => {
 
   const filteredLogs = logs.filter(
     (l) =>
-      l.username.toLowerCase().includes(search.toLowerCase()) ||
+      (l.username && l.username.toLowerCase().includes(search.toLowerCase())) ||
       l.action.toLowerCase().includes(search.toLowerCase()) ||
-      l.entityType.toLowerCase().includes(search.toLowerCase()) ||
+      (l.entityType && l.entityType.toLowerCase().includes(search.toLowerCase())) ||
       (l.metadata && l.metadata.toLowerCase().includes(search.toLowerCase()))
   );
 
@@ -70,6 +77,13 @@ export const AuditLogs: React.FC = () => {
           />
         </div>
       </div>
+
+      {error && (
+        <div className="alert alert-danger mb-3">
+          <ShieldAlert size={16} />
+          <span>{error}</span>
+        </div>
+      )}
 
       <div className="card">
         <div className="card-body p-0">
@@ -96,7 +110,7 @@ export const AuditLogs: React.FC = () => {
                 ) : filteredLogs.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="text-center text-muted py-4">
-                      No audit records matching your search.
+                      {error ? 'Audit logs unavailable.' : 'No audit records matching your search.'}
                     </td>
                   </tr>
                 ) : (

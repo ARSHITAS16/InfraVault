@@ -8,18 +8,16 @@ import {
   Plus,
   Trash2,
   Users,
-  Copy,
   FolderPlus,
-  Monitor,
 } from 'lucide-react';
 import { Datacenter, Folder, Device } from '../types';
 
 export interface TreeDataNode {
   type: 'datacenter' | 'folder' | 'device';
-  id: string; // e.g. "dc-1", "folder-5", "device-10"
+  id: string;
   numericId: number;
   name: string;
-  datacenterId: number; // parent DC
+  datacenterId: number;
   description?: string;
   children?: TreeDataNode[];
   rawObject?: Datacenter | Folder | Device;
@@ -28,6 +26,7 @@ export interface TreeDataNode {
 interface SidebarTreeProps {
   treeData: TreeDataNode[];
   selectedNodeId: string | null;
+  userRole: string;
   onSelectNode: (node: TreeDataNode) => void;
   onAddFolder: (dcId: number) => void;
   onAddDevice: (folderId: number) => void;
@@ -39,14 +38,16 @@ interface SidebarTreeProps {
 export const SidebarTree: React.FC<SidebarTreeProps> = ({
   treeData,
   selectedNodeId,
+  userRole,
   onSelectNode,
   onAddFolder,
   onAddDevice,
   onManageUsers,
-  onCopyPermissions,
   onDeleteNode,
 }) => {
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
+  const canWrite = userRole !== 'VIEWER';
+  const canManageDcUsers = userRole === 'SUPER_ADMIN' || userRole === 'DC_ADMIN';
 
   const toggleExpand = (nodeId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -57,7 +58,7 @@ export const SidebarTree: React.FC<SidebarTreeProps> = ({
   };
 
   const renderNode = (node: TreeDataNode, level: number = 0) => {
-    const isExpanded = expandedNodes[node.id] !== false; // Default expanded
+    const isExpanded = expandedNodes[node.id] !== false;
     const isSelected = selectedNodeId === node.id;
 
     const getNodeIcon = () => {
@@ -70,6 +71,8 @@ export const SidebarTree: React.FC<SidebarTreeProps> = ({
           return <Server className="node-icon icon-device" size={16} />;
       }
     };
+
+    const showDelete = node.type === 'datacenter' ? canManageDcUsers : canWrite;
 
     return (
       <div key={node.id} className="tree-node-wrapper">
@@ -97,30 +100,34 @@ export const SidebarTree: React.FC<SidebarTreeProps> = ({
           <div className="node-action-hover">
             {node.type === 'datacenter' && (
               <>
-                <button
-                  className="icon-action-btn"
-                  title="Add Folder"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAddFolder(node.numericId);
-                  }}
-                >
-                  <FolderPlus size={13} />
-                </button>
-                <button
-                  className="icon-action-btn"
-                  title="Datacenter Users & Copy Permissions"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onManageUsers(node.numericId);
-                  }}
-                >
-                  <Users size={13} />
-                </button>
+                {canWrite && (
+                  <button
+                    className="icon-action-btn"
+                    title="Add Folder"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAddFolder(node.numericId);
+                    }}
+                  >
+                    <FolderPlus size={13} />
+                  </button>
+                )}
+                {canManageDcUsers && (
+                  <button
+                    className="icon-action-btn"
+                    title="Datacenter Users & Copy Permissions"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onManageUsers(node.numericId);
+                    }}
+                  >
+                    <Users size={13} />
+                  </button>
+                )}
               </>
             )}
 
-            {node.type === 'folder' && (
+            {node.type === 'folder' && canWrite && (
               <button
                 className="icon-action-btn"
                 title="Add Device/Host"
@@ -133,16 +140,18 @@ export const SidebarTree: React.FC<SidebarTreeProps> = ({
               </button>
             )}
 
-            <button
-              className="icon-action-btn btn-danger-icon"
-              title={`Delete ${node.type}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeleteNode(node);
-              }}
-            >
-              <Trash2 size={13} />
-            </button>
+            {showDelete && (
+              <button
+                className="icon-action-btn btn-danger-icon"
+                title={`Delete ${node.type}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteNode(node);
+                }}
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -166,7 +175,9 @@ export const SidebarTree: React.FC<SidebarTreeProps> = ({
           <div className="tree-empty-state">
             <Database size={24} className="text-muted" />
             <p>No Datacenters found.</p>
-            <p className="subtext">Click "+ New Datacenter" to start.</p>
+            <p className="subtext">
+              {canManageDcUsers ? 'Click "+ New Datacenter" to start.' : 'Ask an administrator for datacenter access.'}
+            </p>
           </div>
         ) : (
           treeData.map((node) => renderNode(node, 0))

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, EyeOff, Copy, Check, Lock, ShieldAlert, Edit3, KeyRound } from 'lucide-react';
+import { Eye, EyeOff, Copy, Check, Lock, ShieldAlert, Edit3, Trash2 } from 'lucide-react';
 import { credentialsApi } from '../services/api';
 
 interface CredentialFieldProps {
@@ -7,6 +7,8 @@ interface CredentialFieldProps {
   type: string;
   username: string;
   datacenterId: number;
+  canEdit?: boolean;
+  onDeleted?: () => void;
 }
 
 export const CredentialField: React.FC<CredentialFieldProps> = ({
@@ -14,6 +16,8 @@ export const CredentialField: React.FC<CredentialFieldProps> = ({
   type,
   username,
   datacenterId,
+  canEdit = true,
+  onDeleted,
 }) => {
   const [revealed, setRevealed] = useState(false);
   const [secret, setSecret] = useState('');
@@ -29,7 +33,7 @@ export const CredentialField: React.FC<CredentialFieldProps> = ({
   const [editSuccess, setEditSuccess] = useState(false);
 
   useEffect(() => {
-    let timer: any = null;
+    let timer: ReturnType<typeof setInterval> | null = null;
     if (revealed && timeLeft > 0) {
       timer = setInterval(() => {
         setTimeLeft((prev) => prev - 1);
@@ -66,11 +70,14 @@ export const CredentialField: React.FC<CredentialFieldProps> = ({
     }
   };
 
-  const handleCopy = () => {
-    if (secret) {
-      navigator.clipboard.writeText(secret);
+  const handleCopy = async () => {
+    if (!secret) return;
+    try {
+      await navigator.clipboard.writeText(secret);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError('Clipboard copy failed in this browser context');
     }
   };
 
@@ -96,6 +103,17 @@ export const CredentialField: React.FC<CredentialFieldProps> = ({
       setError(err.message || 'Failed to update password');
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete credential "${type}"?`)) return;
+    try {
+      setError('');
+      await credentialsApi.delete(credentialId);
+      if (onDeleted) onDeleted();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete credential');
     }
   };
 
@@ -183,18 +201,31 @@ export const CredentialField: React.FC<CredentialFieldProps> = ({
           </>
         )}
 
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm flex-align gap-1"
-          onClick={() => {
-            setIsEditing(!isEditing);
-            setNewPassword('');
-          }}
-          title="Edit Password"
-        >
-          <Edit3 size={14} />
-          <span>{isEditing ? 'Cancel Edit' : 'Edit'}</span>
-        </button>
+        {canEdit && (
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm flex-align gap-1"
+              onClick={() => {
+                setIsEditing(!isEditing);
+                setNewPassword('');
+              }}
+              title="Edit Password"
+            >
+              <Edit3 size={14} />
+              <span>{isEditing ? 'Cancel Edit' : 'Edit'}</span>
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-danger btn-sm p-1"
+              onClick={handleDelete}
+              title="Delete Credential"
+            >
+              <Trash2 size={14} />
+            </button>
+          </>
+        )}
 
         <button
           type="button"
