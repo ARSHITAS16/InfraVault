@@ -1,21 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Database,
   Folder,
   Server,
-  Lock,
   Plus,
   Trash2,
   Users,
-  Copy,
   Upload,
   Calendar,
-  Tag,
-  HardDrive,
-  Cpu,
   ShieldCheck,
+  ShieldAlert,
   FileSpreadsheet,
-  AlertTriangle,
   Key,
 } from 'lucide-react';
 import { Datacenter, Folder as FolderType, Device, CredentialMasked } from '../types';
@@ -28,6 +23,7 @@ interface InventoryViewProps {
   selectedNode: TreeDataNode | null;
   allDatacenters: Datacenter[];
   allFolders: FolderType[];
+  userRole: string;
   onSelectNode: (node: TreeDataNode) => void;
   onAddFolder: (dcId: number) => void;
   onAddDevice: (folderId: number) => void;
@@ -40,8 +36,7 @@ interface InventoryViewProps {
 export const InventoryView: React.FC<InventoryViewProps> = ({
   treeData,
   selectedNode,
-  allDatacenters,
-  allFolders,
+  userRole,
   onSelectNode,
   onAddFolder,
   onAddDevice,
@@ -50,9 +45,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onOpenImport,
   onDeleteNode,
 }) => {
-  const [activeTab, setActiveTab] = useState<'summary' | 'credentials' | 'permissions'>('summary');
+  const [activeTab, setActiveTab] = useState<'summary' | 'credentials'>('summary');
   const [credentials, setCredentials] = useState<CredentialMasked[]>([]);
   const [loadingCreds, setLoadingCreds] = useState(false);
+  const [credsError, setCredsError] = useState('');
+  const [customFields, setCustomFields] = useState<{ id: number; fieldName: string; fieldValue: string }[]>([]);
 
   // Dynamic secret field creation
   const [showAddSecret, setShowAddSecret] = useState(false);
@@ -61,24 +58,40 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [newSecretPass, setNewSecretPass] = useState('');
   const [savingSecret, setSavingSecret] = useState(false);
 
-  const loadCredentials = () => {
+  const canWrite = userRole !== 'VIEWER';
+  const canManageDcUsers = userRole === 'SUPER_ADMIN' || userRole === 'DC_ADMIN';
+
+  const loadDeviceDetails = useCallback(() => {
     if (selectedNode && selectedNode.type === 'device') {
       setLoadingCreds(true);
+      setCredsError('');
       devicesApi
         .getCredentials(selectedNode.numericId, selectedNode.datacenterId)
         .then((data) => setCredentials(data))
-        .catch(() => setCredentials([]))
+        .catch((err: any) => {
+          setCredentials([]);
+          setCredsError(err.message || 'Failed to load credentials');
+        })
         .finally(() => setLoadingCreds(false));
+
+      devicesApi
+        .getFields(selectedNode.numericId)
+        .then((fields) => setCustomFields(fields))
+        .catch(() => setCustomFields([]));
+    } else {
+      setCredentials([]);
+      setCustomFields([]);
+      setCredsError('');
     }
-  };
+  }, [selectedNode]);
 
   useEffect(() => {
     if (selectedNode && selectedNode.type !== 'device') {
       setActiveTab('summary');
     }
-    loadCredentials();
+    loadDeviceDetails();
     setShowAddSecret(false);
-  }, [selectedNode]);
+  }, [selectedNode, loadDeviceDetails]);
 
   const handleAddSecretSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,7 +109,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       setNewSecretUser('root');
       setNewSecretPass('');
       setShowAddSecret(false);
-      loadCredentials();
+      loadDeviceDetails();
     } catch (err: any) {
       alert(err.message || 'Failed to add encrypted secret');
     } finally {
@@ -110,6 +123,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         <SidebarTree
           treeData={treeData}
           selectedNodeId={null}
+          userRole={userRole}
           onSelectNode={onSelectNode}
           onAddFolder={onAddFolder}
           onAddDevice={onAddDevice}
@@ -133,6 +147,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       <SidebarTree
         treeData={treeData}
         selectedNodeId={selectedNode.id}
+        userRole={userRole}
         onSelectNode={onSelectNode}
         onAddFolder={onAddFolder}
         onAddDevice={onAddDevice}
@@ -160,16 +175,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           <div className="panel-actions">
             {selectedNode.type === 'datacenter' && (
               <>
-                <button className="btn btn-secondary btn-sm" onClick={() => onAddFolder(selectedNode.numericId)}>
-                  <Plus size={15} /> <span>New Folder</span>
-                </button>
-                <button className="btn btn-secondary btn-sm" onClick={() => onManageUsers(selectedNode.numericId)}>
-                  <Users size={15} /> <span>User Access & Copy Permissions</span>
-                </button>
+                {canWrite && (
+                  <button className="btn btn-secondary btn-sm" onClick={() => onAddFolder(selectedNode.numericId)}>
+                    <Plus size={15} /> <span>New Folder</span>
+                  </button>
+                )}
+                {canManageDcUsers && (
+                  <button className="btn btn-secondary btn-sm" onClick={() => onManageUsers(selectedNode.numericId)}>
+                    <Users size={15} /> <span>User Access & Copy Permissions</span>
+                  </button>
+                )}
               </>
             )}
 
-            {selectedNode.type === 'folder' && (
+            {selectedNode.type === 'folder' && canWrite && (
               <>
                 <button className="btn btn-primary btn-sm" onClick={() => onAddDevice(selectedNode.numericId)}>
                   <Plus size={15} /> <span>Add Host</span>
@@ -180,9 +199,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </>
             )}
 
-            <button className="btn btn-danger-outline btn-sm" onClick={() => onDeleteNode(selectedNode)}>
-              <Trash2 size={15} /> <span>Delete {selectedNode.type}</span>
-            </button>
+            {(selectedNode.type === 'datacenter' ? canManageDcUsers : canWrite) && (
+              <button className="btn btn-danger-outline btn-sm" onClick={() => onDeleteNode(selectedNode)}>
+                <Trash2 size={15} /> <span>Delete {selectedNode.type}</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -204,9 +225,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </button>
           )}
 
-          {selectedNode.type === 'datacenter' && (
+          {selectedNode.type === 'datacenter' && canManageDcUsers && (
             <button
-              className={`infravault-tab ${activeTab === 'permissions' ? 'active' : ''}`}
+              className="infravault-tab"
               onClick={() => onManageUsers(selectedNode.numericId)}
             >
               User Access Control
@@ -239,9 +260,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <div className="mt-4">
                     <div className="flex-between mb-2">
                       <span className="font-weight-bold">Child Folders in {selectedNode.name}</span>
-                      <button className="btn btn-primary btn-sm" onClick={() => onAddFolder(selectedNode.numericId)}>
-                        <Plus size={14} /> Add Folder
-                      </button>
+                      {canWrite && (
+                        <button className="btn btn-primary btn-sm" onClick={() => onAddFolder(selectedNode.numericId)}>
+                          <Plus size={14} /> Add Folder
+                        </button>
+                      )}
                     </div>
 
                     <div className="table-responsive">
@@ -291,14 +314,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       <h4>Folder Infrastructure Hosts</h4>
                       <p className="text-muted">Managed hosts inside folder <strong>{selectedNode.name}</strong></p>
                     </div>
-                    <div className="flex-align gap-2">
-                      <button className="btn btn-primary btn-sm" onClick={() => onAddDevice(selectedNode.numericId)}>
-                        <Plus size={14} /> Add Host
-                      </button>
-                      <button className="btn btn-secondary btn-sm" onClick={() => onOpenImport(selectedNode.numericId)}>
-                        <FileSpreadsheet size={14} /> Import Excel
-                      </button>
-                    </div>
+                    {canWrite && (
+                      <div className="flex-align gap-2">
+                        <button className="btn btn-primary btn-sm" onClick={() => onAddDevice(selectedNode.numericId)}>
+                          <Plus size={14} /> Add Host
+                        </button>
+                        <button className="btn btn-secondary btn-sm" onClick={() => onOpenImport(selectedNode.numericId)}>
+                          <FileSpreadsheet size={14} /> Import Excel
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="table-responsive">
@@ -319,7 +344,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         {!selectedNode.children || selectedNode.children.length === 0 ? (
                           <tr>
                             <td colSpan={8} className="text-center text-muted py-4">
-                              No hosts found in this folder. Click "Add Host" or "Import Excel".
+                              No hosts found in this folder.
                             </td>
                           </tr>
                         ) : (
@@ -367,32 +392,56 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   {(() => {
                     const dev = selectedNode.rawObject as Device;
                     return (
-                      <div className="grid-2 mt-3">
-                        <div className="info-row">
-                          <span className="info-label">Hostname:</span>
-                          <span className="info-val">{dev?.hostname || selectedNode.name}</span>
+                      <>
+                        <div className="grid-2 mt-3">
+                          <div className="info-row">
+                            <span className="info-label">Hostname:</span>
+                            <span className="info-val">{dev?.hostname || selectedNode.name}</span>
+                          </div>
+                          <div className="info-row">
+                            <span className="info-label">Model / Hardware:</span>
+                            <span className="info-val">{dev?.model || 'N/A'}</span>
+                          </div>
+                          <div className="info-row">
+                            <span className="info-label">Serial Number:</span>
+                            <span className="info-val">{dev?.serialNumber || 'N/A'}</span>
+                          </div>
+                          <div className="info-row">
+                            <span className="info-label">Capacity:</span>
+                            <span className="info-val">{dev?.capacity || 'N/A'}</span>
+                          </div>
+                          <div className="info-row">
+                            <span className="info-label">Service Tag:</span>
+                            <span className="info-val">{dev?.serviceTag || 'N/A'}</span>
+                          </div>
+                          <div className="info-row">
+                            <span className="info-label">Support End Date (EOD):</span>
+                            <span className="info-val">{dev?.supportEndDate || 'N/A'}</span>
+                          </div>
+                          <div className="info-row">
+                            <span className="info-label">Console Port:</span>
+                            <span className="info-val">{dev?.consolePort || 'N/A'}</span>
+                          </div>
+                          <div className="info-row">
+                            <span className="info-label">iDRAC Configured:</span>
+                            <span className="info-val">{dev?.idracConfigured ? 'Yes' : 'No'}</span>
+                          </div>
                         </div>
-                        <div className="info-row">
-                          <span className="info-label">Model / Hardware:</span>
-                          <span className="info-val">{dev?.model || 'N/A'}</span>
-                        </div>
-                        <div className="info-row">
-                          <span className="info-label">Serial Number:</span>
-                          <span className="info-val">{dev?.serialNumber || 'N/A'}</span>
-                        </div>
-                        <div className="info-row">
-                          <span className="info-label">Capacity:</span>
-                          <span className="info-val">{dev?.capacity || 'N/A'}</span>
-                        </div>
-                        <div className="info-row">
-                          <span className="info-label">Service Tag:</span>
-                          <span className="info-val">{dev?.serviceTag || 'N/A'}</span>
-                        </div>
-                        <div className="info-row">
-                          <span className="info-label">Support End Date (EOD):</span>
-                          <span className="info-val">{dev?.supportEndDate || 'N/A'}</span>
-                        </div>
-                      </div>
+
+                        {customFields.length > 0 && (
+                          <div className="mt-4">
+                            <h4 style={{ fontSize: '14px', marginBottom: '10px' }}>Custom Attributes</h4>
+                            <div className="grid-2">
+                              {customFields.map((cf) => (
+                                <div key={cf.id} className="info-row">
+                                  <span className="info-label">{cf.fieldName}:</span>
+                                  <span className="info-val">{cf.fieldValue || 'N/A'}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     );
                   })()}
                 </div>
@@ -409,16 +458,25 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     All credentials below are encrypted with <strong>AES-256-GCM</strong>. Plaintext passwords are revealed temporarily and logged to the security audit trail.
                   </span>
                 </div>
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => setShowAddSecret(!showAddSecret)}
-                  style={{ whiteSpace: 'nowrap' }}
-                >
-                  <Plus size={14} /> Add Secret Field
-                </button>
+                {canWrite && (
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setShowAddSecret(!showAddSecret)}
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    <Plus size={14} /> Add Secret Field
+                  </button>
+                )}
               </div>
 
-              {showAddSecret && (
+              {credsError && (
+                <div className="alert alert-danger mb-3">
+                  <ShieldAlert size={16} />
+                  <span>{credsError}</span>
+                </div>
+              )}
+
+              {showAddSecret && canWrite && (
                 <form onSubmit={handleAddSecretSubmit} className="card p-3 mb-4" style={{ backgroundColor: '#0b1120', border: '1px solid var(--primary)' }}>
                   <h4 style={{ fontSize: '13px', color: 'var(--primary)', marginBottom: '10px' }}>
                     Add New Encrypted Secret Field
@@ -484,33 +542,36 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       type={cred.type}
                       username={cred.username}
                       datacenterId={selectedNode.datacenterId}
+                      canEdit={canWrite}
+                      onDeleted={loadDeviceDetails}
                     />
                   ))}
 
-                  {/* Built-in Add Credential Field Card */}
-                  <div
-                    className="credential-row-card"
-                    style={{
-                      border: '2px dashed var(--primary)',
-                      backgroundColor: 'rgba(2, 132, 199, 0.08)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      minHeight: '140px',
-                      cursor: 'pointer',
-                      borderRadius: 'var(--radius-md)',
-                    }}
-                    onClick={() => setShowAddSecret(true)}
-                  >
-                    <Plus size={24} color="var(--primary)" />
-                    <span style={{ fontWeight: 700, color: 'var(--primary)', marginTop: '8px', fontSize: '13px' }}>
-                      + Add Credential Field
-                    </span>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      vCenter, VM Cleaner, or Custom Secret
-                    </span>
-                  </div>
+                  {canWrite && (
+                    <div
+                      className="credential-row-card"
+                      style={{
+                        border: '2px dashed var(--primary)',
+                        backgroundColor: 'rgba(2, 132, 199, 0.08)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: '140px',
+                        cursor: 'pointer',
+                        borderRadius: 'var(--radius-md)',
+                      }}
+                      onClick={() => setShowAddSecret(true)}
+                    >
+                      <Plus size={24} color="var(--primary)" />
+                      <span style={{ fontWeight: 700, color: 'var(--primary)', marginTop: '8px', fontSize: '13px' }}>
+                        + Add Credential Field
+                      </span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        vCenter, VM Cleaner, or Custom Secret
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

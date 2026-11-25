@@ -1,5 +1,6 @@
 package com.passwordmanager.backend.controller;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.passwordmanager.backend.entity.Device;
 import com.passwordmanager.backend.service.DeviceService;
 import com.passwordmanager.backend.service.FolderService;
@@ -8,12 +9,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/folders")
-@CrossOrigin(origins = "*")
 public class FolderController {
 
     private final FolderService folderService;
@@ -60,6 +61,7 @@ public class FolderController {
                 request.getSysadminPassword(),
                 request.getSecoffPassword(),
                 request.getPassphrase(),
+                request.getCustomFields(),
                 authentication.getName()
         );
 
@@ -80,6 +82,7 @@ public class FolderController {
         private String sysadminPassword;
         private String secoffPassword;
         private String passphrase;
+        private Map<String, String> customFields = new LinkedHashMap<>();
 
         public String getHostname() { return hostname; }
         public void setHostname(String hostname) { this.hostname = hostname; }
@@ -105,5 +108,18 @@ public class FolderController {
         public void setSecoffPassword(String secoffPassword) { this.secoffPassword = secoffPassword; }
         public String getPassphrase() { return passphrase; }
         public void setPassphrase(String passphrase) { this.passphrase = passphrase; }
+        public Map<String, String> getCustomFields() { return customFields; }
+        public void setCustomFields(Map<String, String> customFields) {
+            if (customFields != null) {
+                this.customFields.putAll(customFields);
+            }
+        }
+
+        @JsonAnySetter
+        public void addCustomField(String key, Object value) {
+            if (key != null && !key.isBlank() && value != null) {
+                this.customFields.put(key, value.toString());
+            }
+        }
     }
 }

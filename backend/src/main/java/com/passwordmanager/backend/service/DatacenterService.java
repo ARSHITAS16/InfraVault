@@ -40,7 +40,7 @@ public class DatacenterService {
     public List<Datacenter> getDatacentersForUser(String username) {
         User user = getUser(username);
 
-        if ("SUPER_ADMIN".equalsIgnoreCase(user.getRole())) {
+        if (isSuperAdmin(user)) {
             return datacenterRepository.findAll();
         }
 
@@ -68,6 +68,11 @@ public class DatacenterService {
 
     @Transactional
     public Datacenter createDatacenter(String name, String description, String username) {
+        User user = getUser(username);
+        if (!isSuperAdmin(user) && !"DC_ADMIN".equalsIgnoreCase(user.getRole())) {
+            throw new SecurityException("Permission denied: Only SUPER_ADMIN or DC_ADMIN can create datacenters");
+        }
+
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("Datacenter name is required");
         }
@@ -77,16 +82,14 @@ public class DatacenterService {
             throw new IllegalArgumentException("Datacenter with name '" + trimmedName + "' already exists");
         }
 
-        User user = getUser(username);
-
         Datacenter datacenter = new Datacenter(trimmedName, description);
         Datacenter savedDatacenter = datacenterRepository.save(datacenter);
 
-        // Automatically give creator ADMIN access to this datacenter
         DatacenterUser datacenterUser = new DatacenterUser(savedDatacenter, user, PermissionLevel.ADMIN);
         datacenterUserRepository.save(datacenterUser);
 
-        auditService.log(user.getId(), user.getUsername(), "CREATE_DATACENTER", "DATACENTER", savedDatacenter.getId(), savedDatacenter.getId(), "Created datacenter: " + savedDatacenter.getName());
+        auditService.log(user.getId(), user.getUsername(), "CREATE_DATACENTER", "DATACENTER",
+                savedDatacenter.getId(), savedDatacenter.getId(), "Created datacenter: " + savedDatacenter.getName());
 
         return savedDatacenter;
     }
@@ -96,31 +99,51 @@ public class DatacenterService {
         Datacenter datacenter = getDatacenter(datacenterId);
         User user = getUser(username);
 
-        if (!hasWriteAccess(datacenterId, user.getId())) {
-            throw new SecurityException("Permission denied to delete datacenter.");
+        if (!hasAdminAccess(datacenterId, user.getId())) {
+            throw new SecurityException("Permission denied: Admin access is required to delete a datacenter.");
         }
 
         long folderCount = folderRepository.countByDatacenterId(datacenterId);
         if (folderCount > 0) {
-            throw new IllegalStateException("Datacenter '" + datacenter.getName() + "' is not empty. It contains " + folderCount + " folders. Delete all folders inside before deleting the datacenter.");
+            throw new IllegalStateException("Datacenter '" + datacenter.getName() + "' is not empty. It contains "
+                    + folderCount + " folders. Delete all folders inside before deleting the datacenter.");
         }
 
-        // Clean up user access permissions for this datacenter
         List<DatacenterUser> dcUsers = datacenterUserRepository.findByDatacenterId(datacenterId);
         datacenterUserRepository.deleteAll(dcUsers);
 
         datacenterRepository.delete(datacenter);
 
-        auditService.log(user.getId(), user.getUsername(), "DELETE_DATACENTER", "DATACENTER", datacenterId, datacenterId, "Deleted datacenter: " + datacenter.getName());
+        auditService.log(user.getId(), user.getUsername(), "DELETE_DATACENTER", "DATACENTER",
+                datacenterId, datacenterId, "Deleted datacenter: " + datacenter.getName());
     }
 
-    public List<DatacenterUser> getUsers(Long datacenterId) {
+    public List<DatacenterUser> getUsers(Long datacenterId, String actorUsername) {
         getDatacenter(datacenterId);
+        User actor = getUser(actorUsername);
+        if (!hasAdminAccess(datacenterId, actor.getId()) && !hasAccess(datacenterId, actor.getId())) {
+            throw new SecurityException("Permission denied to view users for this datacenter");
+        }
         return datacenterUserRepository.findByDatacenterId(datacenterId);
     }
 
     @Transactional
-    public DatacenterUser addUser(Long datacenterId, Long userId, PermissionLevel permissionLevel) {
+    public DatacenterUser addUser(Long datacenterId, Long userId, PermissionLevel permissionLevel, String actorUsername) {
+        User actor = getUser(actorUsername);
+        if (!hasAdminAccess(datacenterId, actor.getId())) {
+            throw new SecurityException("Permission denied: Admin access required to manage datacenter users");
+        }
+
+        DatacenterUser saved = upsertDatacenterUser(datacenterId, userId, permissionLevel);
+
+        auditService.log(actor.getId(), actor.getUsername(), "ASSIGN_DC_USER", "DATACENTER",
+                datacenterId, datacenterId,
+                "Assigned user '" + saved.getUser().getUsername() + "' with " + permissionLevel + " permission");
+
+        return saved;
+    }
+
+    private DatacenterUser upsertDatacenterUser(Long datacenterId, Long userId, PermissionLevel permissionLevel) {
         Datacenter datacenter = getDatacenter(datacenterId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -143,12 +166,21 @@ public class DatacenterService {
     }
 
     @Transactional
-    public void removeUser(Long datacenterId, Long userId) {
+    public void removeUser(Long datacenterId, Long userId, String actorUsername) {
+        User actor = getUser(actorUsername);
+        if (!hasAdminAccess(datacenterId, actor.getId())) {
+            throw new SecurityException("Permission denied: Admin access required to remove datacenter users");
+        }
+
         DatacenterUser datacenterUser = datacenterUserRepository
                 .findByDatacenterIdAndUserId(datacenterId, userId)
                 .orElseThrow(() -> new IllegalArgumentException("User does not have access to this datacenter"));
 
+        String targetUsername = datacenterUser.getUser().getUsername();
         datacenterUserRepository.delete(datacenterUser);
+
+        auditService.log(actor.getId(), actor.getUsername(), "REVOKE_DC_USER", "DATACENTER",
+                datacenterId, datacenterId, "Revoked datacenter access for user '" + targetUsername + "'");
     }
 
     public PermissionLevel getUserPermission(Long datacenterId, Long userId) {
@@ -160,7 +192,10 @@ public class DatacenterService {
 
     public boolean hasAccess(Long datacenterId, Long userId) {
         User user = userRepository.findById(userId).orElse(null);
-        if (user != null && "SUPER_ADMIN".equalsIgnoreCase(user.getRole())) {
+        if (user == null || !user.isActive()) {
+            return false;
+        }
+        if (isSuperAdmin(user)) {
             return true;
         }
         return datacenterUserRepository.existsByDatacenterIdAndUserId(datacenterId, userId);
@@ -168,7 +203,13 @@ public class DatacenterService {
 
     public boolean hasWriteAccess(Long datacenterId, Long userId) {
         User user = userRepository.findById(userId).orElse(null);
-        if (user != null && "SUPER_ADMIN".equalsIgnoreCase(user.getRole())) {
+        if (user == null || !user.isActive()) {
+            return false;
+        }
+        if ("VIEWER".equalsIgnoreCase(user.getRole())) {
+            return false;
+        }
+        if (isSuperAdmin(user)) {
             return true;
         }
 
@@ -178,7 +219,13 @@ public class DatacenterService {
 
     public boolean hasAdminAccess(Long datacenterId, Long userId) {
         User user = userRepository.findById(userId).orElse(null);
-        if (user != null && "SUPER_ADMIN".equalsIgnoreCase(user.getRole())) {
+        if (user == null || !user.isActive()) {
+            return false;
+        }
+        if ("VIEWER".equalsIgnoreCase(user.getRole()) || "OPERATOR".equalsIgnoreCase(user.getRole())) {
+            return false;
+        }
+        if (isSuperAdmin(user)) {
             return true;
         }
 
@@ -186,9 +233,17 @@ public class DatacenterService {
     }
 
     @Transactional
-    public void copyPermissions(Long sourceDatacenterId, Long targetDatacenterId) {
+    public void copyPermissions(Long sourceDatacenterId, Long targetDatacenterId, String actorUsername) {
         if (sourceDatacenterId.equals(targetDatacenterId)) {
             throw new IllegalArgumentException("Source and target datacenter cannot be the same");
+        }
+
+        User actor = getUser(actorUsername);
+        if (!hasAdminAccess(targetDatacenterId, actor.getId())) {
+            throw new SecurityException("Permission denied: Admin access required on target datacenter");
+        }
+        if (!hasAccess(sourceDatacenterId, actor.getId())) {
+            throw new SecurityException("Permission denied: Access required on source datacenter");
         }
 
         getDatacenter(sourceDatacenterId);
@@ -197,8 +252,16 @@ public class DatacenterService {
         List<DatacenterUser> sourceUsers = datacenterUserRepository.findByDatacenterId(sourceDatacenterId);
 
         for (DatacenterUser sourceUser : sourceUsers) {
-            addUser(targetDatacenterId, sourceUser.getUser().getId(), sourceUser.getPermissionLevel());
+            upsertDatacenterUser(targetDatacenterId, sourceUser.getUser().getId(), sourceUser.getPermissionLevel());
         }
+
+        auditService.log(actor.getId(), actor.getUsername(), "COPY_PERMISSIONS", "DATACENTER",
+                targetDatacenterId, targetDatacenterId,
+                "Copied " + sourceUsers.size() + " user permission(s) from datacenter ID " + sourceDatacenterId);
+    }
+
+    private boolean isSuperAdmin(User user) {
+        return user != null && "SUPER_ADMIN".equalsIgnoreCase(user.getRole());
     }
 
     private User getUser(String username) {

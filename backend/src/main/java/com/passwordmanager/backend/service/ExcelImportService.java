@@ -121,8 +121,10 @@ public class ExcelImportService {
 
                 previewRows.add(rowData);
             }
+        } catch (SecurityException | IllegalArgumentException e) {
+            throw e;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to parse Excel file: " + e.getMessage(), e);
+            throw new IllegalArgumentException("Failed to parse Excel file: " + e.getMessage(), e);
         }
 
         return previewRows;

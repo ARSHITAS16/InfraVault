@@ -14,13 +14,19 @@ public class DatabaseConfig {
     @Primary
     public DataSource dataSource(DataSourceProperties properties) {
         String url = properties.getUrl();
-        if (url != null) {
-            if (url.startsWith("postgres://")) {
-                url = "jdbc:postgresql://" + url.substring(11);
-            } else if (url.startsWith("postgresql://")) {
-                url = "jdbc:postgresql://" + url.substring(13);
+        if (url != null && !url.isBlank()) {
+            DatabaseUrlNormalizer.NormalizedDataSource normalized = DatabaseUrlNormalizer.normalize(
+                    url,
+                    properties.getUsername(),
+                    properties.getPassword()
+            );
+            properties.setUrl(normalized.jdbcUrl());
+            if (normalized.username() != null && !normalized.username().isBlank()) {
+                properties.setUsername(normalized.username());
             }
-            properties.setUrl(url);
+            if (normalized.password() != null && !normalized.password().isBlank()) {
+                properties.setPassword(normalized.password());
+            }
         }
         return properties.initializeDataSourceBuilder().build();
     }

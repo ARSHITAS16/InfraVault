@@ -42,6 +42,12 @@ export async function apiRequest<T>(
     data = text;
   }
 
+  if (response.status === 401 && !endpoint.startsWith('/api/auth/')) {
+    localStorage.removeItem('token');
+    window.dispatchEvent(new CustomEvent('infravault:unauthorized'));
+    throw new Error('Your session has expired. Please sign in again.');
+  }
+
   if (!response.ok) {
     let errorMessage = 'API request failed';
     if (typeof data === 'object' && data?.message) {
@@ -196,6 +202,11 @@ export const devicesApi = {
       `/api/devices/${deviceId}/credentials?datacenterId=${datacenterId}`
     ),
 
+  getFields: (deviceId: number) =>
+    apiRequest<{ id: number; fieldName: string; fieldValue: string }[]>(
+      `/api/devices/${deviceId}/fields`
+    ),
+
   delete: (deviceId: number) =>
     apiRequest<void>(`/api/devices/${deviceId}`, {
       method: 'DELETE',
@@ -226,6 +237,11 @@ export const credentialsApi = {
       method: 'POST',
       body: JSON.stringify({ deviceId, type, username, password }),
     }),
+
+  delete: (credentialId: number) =>
+    apiRequest<void>(`/api/credentials/${credentialId}`, {
+      method: 'DELETE',
+    }),
 };
 
 // Audit Log API
@@ -239,7 +255,19 @@ export const usersApi = {
   getAll: () => apiRequest<User[]>('/api/users'),
   getAllUsers: () => apiRequest<User[]>('/api/users'),
   createUser: (username: string, email: string, password: string, role?: string) =>
-    authApi.register(username, email, password, role),
+    apiRequest<User>('/api/users', {
+      method: 'POST',
+      body: JSON.stringify({ username, email, password, role }),
+    }),
+  updateUser: (userId: number, data: { role?: string; active?: boolean; email?: string }) =>
+    apiRequest<User>(`/api/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteUser: (userId: number) =>
+    apiRequest<void>(`/api/users/${userId}`, {
+      method: 'DELETE',
+    }),
 };
 
 // Excel Import API

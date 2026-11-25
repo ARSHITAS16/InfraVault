@@ -3,6 +3,12 @@
 .env.*
 !.env.example
 
+# Database backups / dumps (keep Flyway migrations)
+*.dump
+*.bak
+*.sql.bak
+!.env.example
+
 # Node
 node_modules/
 frontend/dist/

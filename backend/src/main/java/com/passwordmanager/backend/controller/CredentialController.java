@@ -1,7 +1,5 @@
 package com.passwordmanager.backend.controller;
 
-import com.passwordmanager.backend.entity.Device;
-import com.passwordmanager.backend.repository.DeviceRepository;
 import com.passwordmanager.backend.service.CredentialService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -11,15 +9,12 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/credentials")
-@CrossOrigin(origins = "*")
 public class CredentialController {
 
     private final CredentialService credentialService;
-    private final DeviceRepository deviceRepository;
 
-    public CredentialController(CredentialService credentialService, DeviceRepository deviceRepository) {
+    public CredentialController(CredentialService credentialService) {
         this.credentialService = credentialService;
-        this.deviceRepository = deviceRepository;
     }
 
     @PostMapping("/{id}/reveal")
@@ -45,33 +40,33 @@ public class CredentialController {
     }
 
     private ResponseEntity<Map<String, String>> handleUpdate(Long id, Map<String, Object> payload, Authentication authentication) {
-        try {
-            Long datacenterId = payload.get("datacenterId") != null ? Long.valueOf(payload.get("datacenterId").toString()) : null;
-            String newPassword = payload.get("newPassword") != null ? payload.get("newPassword").toString() : payload.get("password") != null ? payload.get("password").toString() : "";
+        Long datacenterId = payload.get("datacenterId") != null ? Long.valueOf(payload.get("datacenterId").toString()) : null;
+        String newPassword = payload.get("newPassword") != null
+                ? payload.get("newPassword").toString()
+                : (payload.get("password") != null ? payload.get("password").toString() : "");
 
-            credentialService.updateCredential(id, datacenterId, newPassword, authentication.getName());
-            return ResponseEntity.ok(Map.of("message", "Password updated successfully"));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("message", e.getMessage() != null ? e.getMessage() : "Error updating credential"));
-        }
+        credentialService.updateCredential(id, datacenterId, newPassword, authentication.getName());
+        return ResponseEntity.ok(Map.of("message", "Password updated successfully"));
     }
 
     @PostMapping("/create")
     public ResponseEntity<Map<String, Object>> createCredential(@RequestBody Map<String, Object> payload,
                                                                 Authentication authentication) {
+        if (payload.get("deviceId") == null || payload.get("type") == null) {
+            throw new IllegalArgumentException("deviceId and type are required");
+        }
         Long deviceId = Long.valueOf(payload.get("deviceId").toString());
         String type = payload.get("type").toString();
         String username = payload.get("username") != null ? payload.get("username").toString() : "admin";
         String password = payload.get("password") != null ? payload.get("password").toString() : "";
 
-        Device device = deviceRepository.findById(deviceId)
-                .orElseThrow(() -> new IllegalArgumentException("Device not found"));
-
-        credentialService.saveCredential(device, type.toUpperCase(), username, password, authentication.getName());
+        credentialService.createCredentialAuthorized(deviceId, type, username, password, authentication.getName());
         return ResponseEntity.ok(Map.of("message", "Credential created successfully"));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteCredential(@PathVariable Long id, Authentication authentication) {
+        credentialService.deleteCredential(id, authentication.getName());
+        return ResponseEntity.noContent().build();
     }
 }

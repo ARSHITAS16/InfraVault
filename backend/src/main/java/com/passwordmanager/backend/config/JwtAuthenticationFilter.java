@@ -1,25 +1,31 @@
 package com.passwordmanager.backend.config;
 
+import com.passwordmanager.backend.entity.User;
+import com.passwordmanager.backend.repository.UserRepository;
 import com.passwordmanager.backend.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final UserRepository userRepository;
 
-    public JwtAuthenticationFilter(JwtService jwtService) {
+    public JwtAuthenticationFilter(JwtService jwtService, UserRepository userRepository) {
         this.jwtService = jwtService;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -44,25 +50,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (username != null &&
                     SecurityContextHolder.getContext().getAuthentication() == null) {
 
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                username,
-                                null,
-                                java.util.Collections.emptyList()
-                        );
+                User user = userRepository.findByUsername(username).orElse(null);
+                if (user != null && user.isActive()) {
+                    String roleName = user.getRole() != null ? user.getRole().toUpperCase() : "VIEWER";
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    user.getUsername(),
+                                    null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_" + roleName))
+                            );
 
-                authentication.setDetails(
-                        new WebAuthenticationDetailsSource()
-                                .buildDetails(request)
-                );
+                    authentication.setDetails(
+                            new WebAuthenticationDetailsSource()
+                                    .buildDetails(request)
+                    );
 
-                SecurityContextHolder.getContext()
-                        .setAuthentication(authentication);
+                    SecurityContextHolder.getContext()
+                            .setAuthentication(authentication);
+                }
             }
 
         } catch (Exception e) {
-            // Invalid or expired token.
-            // Leave the request unauthenticated.
+            // Invalid, expired, or revoked token: leave request unauthenticated.
         }
 
         filterChain.doFilter(request, response);

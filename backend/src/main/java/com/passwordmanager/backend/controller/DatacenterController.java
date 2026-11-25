@@ -15,7 +15,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/datacenters")
-@CrossOrigin(origins = "*")
 public class DatacenterController {
 
     private final DatacenterService datacenterService;
@@ -53,67 +52,41 @@ public class DatacenterController {
         return ResponseEntity.noContent().build();
     }
 
-    // Datacenter user permissions
     @GetMapping("/{id}/users")
-    public ResponseEntity<?> getUsers(@PathVariable Long id) {
-        try {
-            List<DatacenterUser> users = datacenterService.getUsers(id);
-            List<Map<String, Object>> result = users.stream().map(du -> {
-                Map<String, Object> map = new java.util.HashMap<>();
-                map.put("id", du.getId());
-                map.put("permissionLevel", du.getPermissionLevel() != null ? du.getPermissionLevel().name() : null);
-                if (du.getUser() != null) {
-                    Map<String, Object> userMap = new java.util.HashMap<>();
-                    userMap.put("id", du.getUser().getId());
-                    userMap.put("username", du.getUser().getUsername());
-                    userMap.put("email", du.getUser().getEmail());
-                    userMap.put("role", du.getUser().getRole());
-                    map.put("user", userMap);
-                }
-                return map;
-            }).collect(java.util.stream.Collectors.toList());
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            return ResponseEntity.ok(java.util.Collections.emptyList());
-        }
+    public ResponseEntity<?> getUsers(@PathVariable Long id, Authentication authentication) {
+        List<DatacenterUser> users = datacenterService.getUsers(id, authentication.getName());
+        List<Map<String, Object>> result = users.stream().map(this::toDatacenterUserMap).toList();
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/{id}/users")
-    public ResponseEntity<?> addUser(@PathVariable Long id, @RequestBody AddUserRequest request) {
-        try {
-            PermissionLevel level = PermissionLevel.valueOf(request.getPermissionLevel().toUpperCase());
-            DatacenterUser du = datacenterService.addUser(id, request.getUserId(), level);
-            Map<String, Object> map = new java.util.HashMap<>();
-            map.put("id", du.getId());
-            map.put("permissionLevel", du.getPermissionLevel() != null ? du.getPermissionLevel().name() : null);
-            if (du.getUser() != null) {
-                Map<String, Object> userMap = new java.util.HashMap<>();
-                userMap.put("id", du.getUser().getId());
-                userMap.put("username", du.getUser().getUsername());
-                userMap.put("email", du.getUser().getEmail());
-                userMap.put("role", du.getUser().getRole());
-                map.put("user", userMap);
-            }
-            return ResponseEntity.ok(map);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage() != null ? e.getMessage() : "Failed to add user"));
+    public ResponseEntity<?> addUser(@PathVariable Long id,
+                                     @RequestBody AddUserRequest request,
+                                     Authentication authentication) {
+        if (request.getUserId() == null || request.getPermissionLevel() == null) {
+            throw new IllegalArgumentException("userId and permissionLevel are required");
         }
+        PermissionLevel level = PermissionLevel.valueOf(request.getPermissionLevel().trim().toUpperCase());
+        DatacenterUser du = datacenterService.addUser(id, request.getUserId(), level, authentication.getName());
+        return ResponseEntity.ok(toDatacenterUserMap(du));
     }
 
     @DeleteMapping("/{id}/users/{userId}")
-    public ResponseEntity<Void> removeUser(@PathVariable Long id, @PathVariable Long userId) {
-        datacenterService.removeUser(id, userId);
+    public ResponseEntity<Void> removeUser(@PathVariable Long id,
+                                           @PathVariable Long userId,
+                                           Authentication authentication) {
+        datacenterService.removeUser(id, userId, authentication.getName());
         return ResponseEntity.noContent().build();
     }
 
-    // Copy permissions from another datacenter
     @PostMapping("/{id}/copy-permissions")
-    public ResponseEntity<Map<String, String>> copyPermissions(@PathVariable Long id, @RequestParam Long sourceId) {
-        datacenterService.copyPermissions(sourceId, id);
+    public ResponseEntity<Map<String, String>> copyPermissions(@PathVariable Long id,
+                                                               @RequestParam Long sourceId,
+                                                               Authentication authentication) {
+        datacenterService.copyPermissions(sourceId, id, authentication.getName());
         return ResponseEntity.ok(Map.of("message", "Permissions copied successfully"));
     }
 
-    // Folders under datacenter
     @GetMapping("/{id}/folders")
     public ResponseEntity<List<Folder>> getFolders(@PathVariable Long id, Authentication authentication) {
         return ResponseEntity.ok(folderService.getFoldersForDatacenter(id, authentication.getName()));
@@ -125,6 +98,21 @@ public class DatacenterController {
                                                @RequestBody Map<String, String> body) {
         Folder folder = folderService.createFolder(id, body.get("name"), authentication.getName());
         return ResponseEntity.ok(folder);
+    }
+
+    private Map<String, Object> toDatacenterUserMap(DatacenterUser du) {
+        Map<String, Object> map = new java.util.HashMap<>();
+        map.put("id", du.getId());
+        map.put("permissionLevel", du.getPermissionLevel() != null ? du.getPermissionLevel().name() : null);
+        if (du.getUser() != null) {
+            Map<String, Object> userMap = new java.util.HashMap<>();
+            userMap.put("id", du.getUser().getId());
+            userMap.put("username", du.getUser().getUsername());
+            userMap.put("email", du.getUser().getEmail());
+            userMap.put("role", du.getUser().getRole());
+            map.put("user", userMap);
+        }
+        return map;
     }
 
     public static class CreateDatacenterRequest {
@@ -139,7 +127,7 @@ public class DatacenterController {
 
     public static class AddUserRequest {
         private Long userId;
-        private String permissionLevel; // ADMIN, WRITE, READ
+        private String permissionLevel;
 
         public Long getUserId() { return userId; }
         public void setUserId(Long userId) { this.userId = userId; }

@@ -11,4 +11,5 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
     List<AuditLog> findAllByOrderByTimestampDesc();
     List<AuditLog> findByDatacenterIdOrderByTimestampDesc(Long datacenterId);
     List<AuditLog> findTop50ByOrderByTimestampDesc();
+    List<AuditLog> findTop50ByDatacenterIdInOrderByTimestampDesc(List<Long> datacenterIds);
 }

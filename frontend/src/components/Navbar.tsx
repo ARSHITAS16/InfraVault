@@ -1,13 +1,10 @@
 import React from 'react';
 import {
-  Server,
-  Shield,
   Search,
   Plus,
   LogOut,
   User as UserIcon,
   Upload,
-  Layers,
   FileText,
 } from 'lucide-react';
 import ringCentralLogo from '../assets/ringcentral-logo.png';
@@ -35,6 +32,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenUsers,
   onLogout,
 }) => {
+  const isAdmin = role === 'SUPER_ADMIN' || role === 'DC_ADMIN';
+  const canWrite = role !== 'VIEWER';
+
   return (
     <header className="infravault-navbar">
       <div className="navbar-brand">
@@ -62,45 +62,53 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       <div className="navbar-actions">
-        <button
-          className="btn btn-secondary btn-sm"
-          onClick={onOpenCreateDatacenter}
-          title="Create New Datacenter"
-        >
-          <Plus size={15} />
-          <span>New Datacenter</span>
-        </button>
+        {isAdmin && (
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={onOpenCreateDatacenter}
+            title="Create New Datacenter"
+          >
+            <Plus size={15} />
+            <span>New Datacenter</span>
+          </button>
+        )}
 
-        <button
-          className="btn btn-secondary btn-sm"
-          onClick={onOpenImport}
-          title="Import Devices from Excel"
-        >
-          <Upload size={15} />
-          <span>Excel Import</span>
-        </button>
+        {canWrite && (
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={onOpenImport}
+            title="Import Devices from Excel"
+          >
+            <Upload size={15} />
+            <span>Excel Import</span>
+          </button>
+        )}
 
-        <button
-          className="btn btn-secondary btn-sm"
-          onClick={onOpenAuditLogs}
-          title="View Audit Logs"
-        >
-          <FileText size={15} />
-          <span>Audit Logs</span>
-        </button>
+        {isAdmin && (
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={onOpenAuditLogs}
+            title="View Audit Logs"
+          >
+            <FileText size={15} />
+            <span>Audit Logs</span>
+          </button>
+        )}
 
-        <button
-          className="btn btn-secondary btn-sm"
-          onClick={onOpenUsers}
-          title="Manage Users & Access"
-        >
-          <UserIcon size={15} />
-          <span>Users</span>
-        </button>
+        {isAdmin && (
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={onOpenUsers}
+            title="Manage Users & Access"
+          >
+            <UserIcon size={15} />
+            <span>Users</span>
+          </button>
+        )}
 
         <div className="user-profile">
           <div className="user-avatar">
-            {username.substring(0, 2).toUpperCase()}
+            {(username || 'U').substring(0, 2).toUpperCase()}
           </div>
           <div className="user-info">
             <span className="user-name">{username}</span>

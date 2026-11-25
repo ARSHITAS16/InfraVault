@@ -6,15 +6,27 @@ services:
     region: oregon
     rootDir: backend
     dockerfilePath: Dockerfile
+    healthCheckPath: /actuator/health
     envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
       - key: SPRING_DATASOURCE_URL
-        fromDatabase:
-          name: infravault-db
-          property: connectionString
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
       - key: SPRING_JPA_HIBERNATE_DDL_AUTO
-        value: update
-
-databases:
-  - name: infravault-db
-    region: oregon
-    plan: free
+        value: validate
+      - key: JWT_SECRET
+        sync: false
+      - key: APP_ENCRYPTION_KEY
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://arshitas16.github.io
+      - key: ADMIN_INIT_USERNAME
+        sync: false
+      - key: ADMIN_INIT_EMAIL
+        sync: false
+      - key: ADMIN_INIT_PASSWORD
+        sync: false

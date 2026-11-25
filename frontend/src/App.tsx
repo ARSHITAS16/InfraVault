@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import './App.css';
 import { Datacenter, Folder, Device } from './types';
 import { datacentersApi, foldersApi, devicesApi } from './services/api';
@@ -20,8 +20,8 @@ import { ExcelImportModal } from './components/ExcelImportModal';
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [username, setUsername] = useState<string>(localStorage.getItem('username') || '');
-  const [userId, setUserId] = useState<number>(Number(localStorage.getItem('userId')) || 0);
   const [role, setRole] = useState<string>(localStorage.getItem('role') || 'OPERATOR');
+  const [sessionNotice, setSessionNotice] = useState<string>('');
 
   const [activeView, setActiveView] = useState<'dashboard' | 'inventory' | 'audit' | 'users'>('inventory');
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,6 +31,7 @@ export default function App() {
   const [treeData, setTreeData] = useState<TreeDataNode[]>([]);
   const [selectedNode, setSelectedNode] = useState<TreeDataNode | null>(null);
   const [loadingInventory, setLoadingInventory] = useState(false);
+  const [inventoryError, setInventoryError] = useState('');
 
   // Modals
   const [modalState, setModalState] = useState<{
@@ -41,6 +42,9 @@ export default function App() {
     folderName?: string;
     targetDc?: Datacenter;
   }>({ type: null });
+
+  const isAdmin = role === 'SUPER_ADMIN' || role === 'DC_ADMIN';
+  const canWrite = role !== 'VIEWER';
 
   const findNodeById = (nodes: TreeDataNode[], id: string): TreeDataNode | null => {
     for (const n of nodes) {
@@ -53,11 +57,36 @@ export default function App() {
     return null;
   };
 
+  const handleLogout = useCallback((notice?: string) => {
+    localStorage.clear();
+    setToken(null);
+    setUsername('');
+    setRole('OPERATOR');
+    setDatacenters([]);
+    setFolders([]);
+    setTreeData([]);
+    setSelectedNode(null);
+    setSearchQuery('');
+    setInventoryError('');
+    if (notice) {
+      setSessionNotice(notice);
+    }
+  }, []);
+
+  useEffect(() => {
+    const onUnauthorized = () => {
+      handleLogout('Your session expired or is invalid. Please sign in again.');
+    };
+    window.addEventListener('infravault:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('infravault:unauthorized', onUnauthorized);
+  }, [handleLogout]);
+
   const loadFullInventory = useCallback(async () => {
     if (!token) return;
 
     try {
       setLoadingInventory(true);
+      setInventoryError('');
       const dcs = await datacentersApi.getDatacenters();
       setDatacenters(dcs);
 
@@ -125,9 +154,12 @@ export default function App() {
           const found = findNodeById(treeNodes, prev.id);
           return found || treeNodes[0];
         });
+      } else {
+        setSelectedNode(null);
       }
     } catch (err: any) {
       console.error('Failed to load inventory:', err);
+      setInventoryError(err.message || 'Failed to load infrastructure inventory');
     } finally {
       setLoadingInventory(false);
     }
@@ -139,28 +171,56 @@ export default function App() {
     }
   }, [token, loadFullInventory]);
 
+  const filteredTreeData = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return treeData;
+
+    const filterNodes = (nodes: TreeDataNode[]): TreeDataNode[] => {
+      const results: TreeDataNode[] = [];
+      for (const node of nodes) {
+        const dev = node.type === 'device' ? (node.rawObject as Device | undefined) : undefined;
+        const selfMatches =
+          node.name.toLowerCase().includes(q) ||
+          (node.description && node.description.toLowerCase().includes(q)) ||
+          (dev?.model && dev.model.toLowerCase().includes(q)) ||
+          (dev?.serialNumber && dev.serialNumber.toLowerCase().includes(q)) ||
+          (dev?.serviceTag && dev.serviceTag.toLowerCase().includes(q)) ||
+          (dev?.consolePort && dev.consolePort.toLowerCase().includes(q));
+
+        if (selfMatches) {
+          results.push(node);
+        } else if (node.children && node.children.length > 0) {
+          const matchingChildren = filterNodes(node.children);
+          if (matchingChildren.length > 0) {
+            results.push({ ...node, children: matchingChildren });
+          }
+        }
+      }
+      return results;
+    };
+
+    return filterNodes(treeData);
+  }, [treeData, searchQuery]);
+
   const handleLoginSuccess = (newToken: string, newUsername: string, newUserId: number, newRole: string) => {
     localStorage.setItem('token', newToken);
     localStorage.setItem('username', newUsername);
     localStorage.setItem('userId', newUserId.toString());
     localStorage.setItem('role', newRole);
 
+    setSessionNotice('');
     setToken(newToken);
     setUsername(newUsername);
-    setUserId(newUserId);
     setRole(newRole);
     setActiveView('inventory');
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    setToken(null);
-    setUsername('');
-    setUserId(0);
-    setRole('OPERATOR');
-  };
-
   const handleDeleteNode = async (node: TreeDataNode) => {
+    if (!canWrite) {
+      alert('Permission denied: VIEWER accounts have read-only access.');
+      return;
+    }
+
     if (node.type === 'datacenter' && node.children && node.children.length > 0) {
       alert(`Cannot delete Datacenter "${node.name}" because it contains ${node.children.length} folder(s). Please delete all child folders first.`);
       return;
@@ -191,7 +251,7 @@ export default function App() {
   };
 
   if (!token) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
+    return <Login onLoginSuccess={handleLoginSuccess} sessionNotice={sessionNotice} />;
   }
 
   if (loadingInventory && treeData.length === 0) {
@@ -218,12 +278,17 @@ export default function App() {
         username={username}
         role={role}
         searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        onSearchChange={(q) => {
+          setSearchQuery(q);
+          if (q.trim() && activeView !== 'inventory') {
+            setActiveView('inventory');
+          }
+        }}
         onOpenCreateDatacenter={() => setModalState({ type: 'createDc' })}
         onOpenImport={() => setModalState({ type: 'excelImport' })}
         onOpenAuditLogs={() => setActiveView('audit')}
         onOpenUsers={() => setActiveView('users')}
-        onLogout={handleLogout}
+        onLogout={() => handleLogout()}
       />
 
       <div className="infravault-subnav">
@@ -241,20 +306,33 @@ export default function App() {
           Dashboard Summary
         </button>
 
-        <button
-          className={`subnav-btn ${activeView === 'audit' ? 'active' : ''}`}
-          onClick={() => setActiveView('audit')}
-        >
-          Audit Logs
-        </button>
+        {isAdmin && (
+          <button
+            className={`subnav-btn ${activeView === 'audit' ? 'active' : ''}`}
+            onClick={() => setActiveView('audit')}
+          >
+            Audit Logs
+          </button>
+        )}
 
-        <button
-          className={`subnav-btn ${activeView === 'users' ? 'active' : ''}`}
-          onClick={() => setActiveView('users')}
-        >
-          Users & Access Control
-        </button>
+        {isAdmin && (
+          <button
+            className={`subnav-btn ${activeView === 'users' ? 'active' : ''}`}
+            onClick={() => setActiveView('users')}
+          >
+            Users & Access Control
+          </button>
+        )}
       </div>
+
+      {inventoryError && (
+        <div className="alert alert-danger m-3 flex-between">
+          <span>{inventoryError}</span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={loadFullInventory}>
+            Retry
+          </button>
+        </div>
+      )}
 
       <main className="infravault-body">
         {activeView === 'dashboard' && (
@@ -262,6 +340,7 @@ export default function App() {
             datacenters={datacenters}
             totalFolders={folders.length}
             totalDevices={totalDevices}
+            isAdmin={isAdmin}
             onNavigateToDatacenter={(dcId) => {
               const node = treeData.find((n) => n.numericId === dcId);
               if (node) setSelectedNode(node);
@@ -272,10 +351,11 @@ export default function App() {
 
         {activeView === 'inventory' && (
           <InventoryView
-            treeData={treeData}
+            treeData={filteredTreeData}
             selectedNode={selectedNode}
             allDatacenters={datacenters}
             allFolders={folders}
+            userRole={role}
             onSelectNode={setSelectedNode}
             onAddFolder={(dcId) => {
               const dc = datacenters.find((d) => d.id === dcId);
@@ -299,7 +379,7 @@ export default function App() {
         )}
 
         {activeView === 'audit' && <AuditLogs />}
-        {activeView === 'users' && <UsersPage />}
+        {activeView === 'users' && <UsersPage currentUserRole={role} />}
       </main>
 
       {/* Render Active Modals */}

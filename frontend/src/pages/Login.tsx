@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
-import { Lock, User, Mail, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Lock, User, Mail, ShieldAlert, Info } from 'lucide-react';
 import ringCentralLogo from '../assets/ringcentral-logo.png';
 import { authApi } from '../services/api';
 
 interface LoginProps {
   onLoginSuccess: (token: string, username: string, userId: number, role: string) => void;
+  sessionNotice?: string;
 }
 
-export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
+export const Login: React.FC<LoginProps> = ({ onLoginSuccess, sessionNotice }) => {
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('OPERATOR');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -23,7 +23,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     try {
       setLoading(true);
       if (isRegister) {
-        const res = await authApi.register(username, email, password, role);
+        const res = await authApi.register(username, email, password);
         onLoginSuccess(res.token, res.username, res.id, res.role);
       } else {
         const res = await authApi.login(username, password);
@@ -52,6 +52,13 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">
+          {sessionNotice && !error && (
+            <div className="alert alert-warning mb-3">
+              <Info size={16} />
+              <span>{sessionNotice}</span>
+            </div>
+          )}
+
           {error && (
             <div className="alert alert-danger mb-3">
               <ShieldAlert size={16} />
@@ -99,27 +106,21 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               <input
                 type="password"
                 className="form-control"
-                placeholder="Enter password"
+                placeholder={isRegister ? 'Minimum 8 characters' : 'Enter password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                minLength={isRegister ? 8 : undefined}
                 required
               />
             </div>
           </div>
 
           {isRegister && (
-            <div className="form-group">
-              <label className="form-label">Initial Role:</label>
-              <select
-                className="form-control"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-              >
-                <option value="SUPER_ADMIN">SUPER_ADMIN (System Administrator)</option>
-                <option value="DC_ADMIN">DC_ADMIN (Datacenter Administrator)</option>
-                <option value="OPERATOR">OPERATOR (Read & Write Devices)</option>
-                <option value="VIEWER">VIEWER (Read Only)</option>
-              </select>
+            <div className="alert alert-info mb-3" style={{ fontSize: '12px' }}>
+              <Info size={15} />
+              <span>
+                Self-registered accounts are created with <strong>VIEWER</strong> privileges until an administrator assigns Datacenter access.
+              </span>
             </div>
           )}
 
