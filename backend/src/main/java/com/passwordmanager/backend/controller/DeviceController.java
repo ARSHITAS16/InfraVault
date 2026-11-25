@@ -12,7 +12,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/devices")
-@CrossOrigin(origins = "*")
 public class DeviceController {
 
     private final DeviceService deviceService;
@@ -36,8 +35,14 @@ public class DeviceController {
 
     @GetMapping("/{id}/credentials")
     public ResponseEntity<List<Map<String, Object>>> getCredentials(@PathVariable Long id,
-                                                                    @RequestParam Long datacenterId,
+                                                                    @RequestParam(required = false) Long datacenterId,
                                                                     Authentication authentication) {
         return ResponseEntity.ok(credentialService.getMaskedCredentialsForDevice(id, datacenterId, authentication.getName()));
+    }
+
+    @GetMapping("/{id}/fields")
+    public ResponseEntity<List<Map<String, Object>>> getCustomFields(@PathVariable Long id,
+                                                                     Authentication authentication) {
+        return ResponseEntity.ok(deviceService.getDeviceFields(id, authentication.getName()));
     }
 }

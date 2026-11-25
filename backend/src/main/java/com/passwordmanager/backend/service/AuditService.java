@@ -5,7 +5,7 @@ import com.passwordmanager.backend.repository.AuditLogRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -29,5 +29,12 @@ public class AuditService {
 
     public List<AuditLog> getLogsForDatacenter(Long datacenterId) {
         return auditLogRepository.findByDatacenterIdOrderByTimestampDesc(datacenterId);
+    }
+
+    public List<AuditLog> getLogsForDatacenters(List<Long> datacenterIds) {
+        if (datacenterIds == null || datacenterIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return auditLogRepository.findTop50ByDatacenterIdInOrderByTimestampDesc(datacenterIds);
     }
 }

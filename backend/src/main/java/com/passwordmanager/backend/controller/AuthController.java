@@ -3,11 +3,12 @@ package com.passwordmanager.backend.controller;
 import com.passwordmanager.backend.dto.AuthResponse;
 import com.passwordmanager.backend.entity.User;
 import com.passwordmanager.backend.service.AuthService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*")
 public class AuthController {
 
     private final AuthService authService;
@@ -17,7 +18,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public AuthResponse register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<AuthResponse> register(@RequestBody RegisterRequest request) {
         User user = authService.register(
                 request.username(),
                 request.email(),
@@ -27,17 +28,17 @@ public class AuthController {
 
         String token = authService.generateToken(user);
 
-        return new AuthResponse(
+        return ResponseEntity.status(HttpStatus.CREATED).body(new AuthResponse(
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
                 user.getRole(),
                 token
-        );
+        ));
     }
 
     @PostMapping("/login")
-    public AuthResponse login(@RequestBody LoginRequest request) {
+    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
         User user = authService.login(
                 request.username(),
                 request.password()
@@ -45,13 +46,13 @@ public class AuthController {
 
         String token = authService.generateToken(user);
 
-        return new AuthResponse(
+        return ResponseEntity.ok(new AuthResponse(
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
                 user.getRole(),
                 token
-        );
+        ));
     }
 
     public record RegisterRequest(

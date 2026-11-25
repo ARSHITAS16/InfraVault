@@ -1,9 +1,11 @@
 package com.passwordmanager.backend.service;
 
 import com.passwordmanager.backend.entity.Device;
+import com.passwordmanager.backend.entity.DeviceField;
 import com.passwordmanager.backend.entity.Folder;
 import com.passwordmanager.backend.entity.User;
 import com.passwordmanager.backend.repository.CredentialRepository;
+import com.passwordmanager.backend.repository.DeviceFieldRepository;
 import com.passwordmanager.backend.repository.DeviceRepository;
 import com.passwordmanager.backend.repository.FolderRepository;
 import com.passwordmanager.backend.repository.UserRepository;
@@ -13,7 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class DeviceService {
@@ -23,6 +27,7 @@ public class DeviceService {
     private final DatacenterService datacenterService;
     private final CredentialService credentialService;
     private final CredentialRepository credentialRepository;
+    private final DeviceFieldRepository deviceFieldRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
 
@@ -34,6 +39,7 @@ public class DeviceService {
                          DatacenterService datacenterService,
                          CredentialService credentialService,
                          CredentialRepository credentialRepository,
+                         DeviceFieldRepository deviceFieldRepository,
                          UserRepository userRepository,
                          AuditService auditService) {
         this.deviceRepository = deviceRepository;
@@ -41,6 +47,7 @@ public class DeviceService {
         this.datacenterService = datacenterService;
         this.credentialService = credentialService;
         this.credentialRepository = credentialRepository;
+        this.deviceFieldRepository = deviceFieldRepository;
         this.userRepository = userRepository;
         this.auditService = auditService;
     }
@@ -68,6 +75,17 @@ public class DeviceService {
         return device;
     }
 
+    public List<Map<String, Object>> getDeviceFields(Long deviceId, String username) {
+        Device device = getDevice(deviceId, username);
+        return deviceFieldRepository.findByDeviceId(device.getId()).stream().map(df -> {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", df.getId());
+            m.put("fieldName", df.getFieldName());
+            m.put("fieldValue", df.getFieldValue());
+            return m;
+        }).toList();
+    }
+
     @Transactional
     public Device createDevice(Long folderId,
                                String hostname,
@@ -82,6 +100,7 @@ public class DeviceService {
                                String sysadminPassword,
                                String secoffPassword,
                                String passphrase,
+                               Map<String, String> customFields,
                                String username) {
         if (hostname == null || hostname.isBlank()) {
             throw new IllegalArgumentException("Hostname is required");
@@ -106,13 +125,21 @@ public class DeviceService {
 
         Device savedDevice = deviceRepository.save(device);
 
-        // Save encrypted credentials
+        if (customFields != null) {
+            for (Map.Entry<String, String> entry : customFields.entrySet()) {
+                if (entry.getKey() != null && !entry.getKey().isBlank()) {
+                    deviceFieldRepository.save(new DeviceField(entry.getKey().trim(), entry.getValue(), savedDevice));
+                }
+            }
+        }
+
         credentialService.saveCredential(savedDevice, "IDRAC", "root", idracPassword, username);
         credentialService.saveCredential(savedDevice, "SYSADMIN", "sysadmin", sysadminPassword, username);
         credentialService.saveCredential(savedDevice, "SECOFF", "secoff", secoffPassword, username);
         credentialService.saveCredential(savedDevice, "PASSPHRASE", "admin", passphrase, username);
 
-        auditService.log(user.getId(), user.getUsername(), "CREATE_DEVICE", "DEVICE", savedDevice.getId(), datacenterId, "Created device: " + savedDevice.getHostname());
+        auditService.log(user.getId(), user.getUsername(), "CREATE_DEVICE", "DEVICE", savedDevice.getId(), datacenterId,
+                "Created device: " + savedDevice.getHostname());
 
         return savedDevice;
     }
@@ -129,8 +156,11 @@ public class DeviceService {
             throw new SecurityException("Permission denied to delete device in this datacenter");
         }
 
-        // Native SQL delete guarantees credentials are deleted FIRST in PostgreSQL before device
         entityManager.createNativeQuery("DELETE FROM credentials WHERE device_id = :deviceId")
+                .setParameter("deviceId", deviceId)
+                .executeUpdate();
+
+        entityManager.createNativeQuery("DELETE FROM device_fields WHERE device_id = :deviceId")
                 .setParameter("deviceId", deviceId)
                 .executeUpdate();
 
@@ -138,7 +168,8 @@ public class DeviceService {
                 .setParameter("deviceId", deviceId)
                 .executeUpdate();
 
-        auditService.log(user.getId(), user.getUsername(), "DELETE_DEVICE", "DEVICE", deviceId, datacenterId, "Deleted device: " + device.getHostname());
+        auditService.log(user.getId(), user.getUsername(), "DELETE_DEVICE", "DEVICE", deviceId, datacenterId,
+                "Deleted device: " + device.getHostname());
     }
 
     private Folder getFolder(Long folderId) {

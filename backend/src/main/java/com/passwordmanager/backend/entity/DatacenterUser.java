@@ -58,9 +58,6 @@ public class DatacenterUser {
     }
 
     public User getUser() {
-        if (user != null) {
-            user.setPasswordHash(null);
-        }
         return user;
     }
 
